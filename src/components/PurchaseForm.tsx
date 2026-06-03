@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, Sparkles, Loader2 } from 'lucide-react';
+import { Camera, Sparkles, Loader as Loader2 } from 'lucide-react';
 import type { ProductInput } from '../types';
 import { CATEGORIES, ITEM_TYPES, BRANDS, CONDITIONS, sizesForCategory } from '../lib/options';
 
@@ -99,23 +99,44 @@ export function PurchaseForm({ input, onChange, images, onImages, onAnalyzeImage
       <div className="upload">
         <Camera />
         <div style={{ flex: 1 }}>
-          <strong>写真アップロード</strong>
-          <p>商品写真をアップしてAIに自動入力させることができます。</p>
-          <input type="file" multiple accept="image/*" onChange={(e) => onImages(e.target.files)} />
+          <strong>写真撮影・アップロード</strong>
+          <p>その場で撮影 or アップロードして AI に自動入力させられます。</p>
+          <div className="upload-buttons">
+            <label className="btn btn-ghost">
+              <Camera size={16} /> 撮影する
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: 'none' }}
+                onChange={(e) => onImages(e.target.files)}
+              />
+            </label>
+            <label className="btn btn-ghost">
+              アップロード
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => onImages(e.target.files)}
+              />
+            </label>
+          </div>
           {images.length > 0 && (
             <button
               type="button"
               className="btn btn-primary mt-12"
               onClick={onAnalyzeImages}
               disabled={analyzing || !aiAvailable}
-              title={!aiAvailable ? 'OpenAI APIキー未設定' : ''}
+              title={!aiAvailable ? 'GEMINI_API_KEY 未設定' : ''}
             >
               {analyzing ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
               {analyzing ? 'AI解析中...' : 'AIで自動入力'}
             </button>
           )}
           {!aiAvailable && images.length > 0 && (
-            <p className="hint">画像AIを使うにはエッジ関数に OPENAI_API_KEY を設定してください。</p>
+            <p className="hint">画像AIを使うにはエッジ関数に GEMINI_API_KEY を設定してください。</p>
           )}
         </div>
       </div>

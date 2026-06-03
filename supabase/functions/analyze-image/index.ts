@@ -10,15 +10,26 @@ const SYSTEM_PROMPT = `あなたは中古衣料・バッグの目利きです。
 未確認なら null。日本語で。
 スキーマ:
 {
-  "brand": string|null,           // 例 "CELFORD" / "GUCCI"
-  "category": string|null,        // "レディース服" / "メンズ服" / "バッグ・小物" / "靴" / "高級ブランド" / "キッズ" / "スポーツ・アウトドア"
-  "itemType": string|null,        // "ワンピース" / "ブラウス・シャツ" / "ニット・カーディガン" / "アウター" / "パンツ" / "スカート" / "スーツ・セットアップ" / "バッグ" / "財布・小物" / "靴" / "スポーツウェア"
-  "size": string|null,            // 例 "38" / "M"
-  "material": string|null,        // 例 "シルク100%"
-  "condition": string|null,       // "新品・未使用" / "未使用に近い" / "美品" / "目立った傷や汚れなし" / "やや傷や汚れあり" / "傷や汚れあり" / "全体的に状態が悪い"
-  "hasTag": boolean|null,         // 値札・タグが付いているか
-  "hasDamage": boolean|null       // 明確なダメージが見えるか
-}`;
+  "brand": string|null,
+  "category": string|null,
+  "itemType": string|null,
+  "size": string|null,
+  "material": string|null,
+  "condition": string|null,
+  "hasTag": boolean|null,
+  "hasDamage": boolean|null
+}
+category は "レディース服" / "メンズ服" / "バッグ・小物" / "靴" / "高級ブランド" / "キッズ" / "スポーツ・アウトドア" のいずれか。
+itemType は "ワンピース" / "ブラウス・シャツ" / "ニット・カーディガン" / "アウター" / "パンツ" / "スカート" / "スーツ・セットアップ" / "バッグ" / "財布・小物" / "靴" / "スポーツウェア" のいずれか。
+condition は "新品・未使用" / "未使用に近い" / "美品" / "目立った傷や汚れなし" / "やや傷や汚れあり" / "傷や汚れあり" / "全体的に状態が悪い" のいずれか。`;
+
+type DataUrl = string;
+
+function parseDataUrl(s: DataUrl): { mime: string; data: string } | null {
+  const m = s.match(/^data:([^;,]+);base64,(.*)$/);
+  if (!m) return null;
+  return { mime: m[1], data: m[2] };
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -26,15 +37,15 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const apiKey = Deno.env.get("OPENAI_API_KEY");
+    const apiKey = Deno.env.get("GEMINI_API_KEY");
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: "OPENAI_API_KEY is not configured. Set it as an Edge Function secret." }),
+        JSON.stringify({ error: "GEMINI_API_KEY is not configured. Set it as an Edge Function secret." }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const { images } = (await req.json()) as { images: string[] };
+    const { images } = (await req.json()) as { images: DataUrl[] };
     if (!Array.isArray(images) || images.length === 0) {
       return new Response(JSON.stringify({ error: "images required" }), {
         status: 400,
@@ -43,43 +54,49 @@ Deno.serve(async (req: Request) => {
     }
 
     const limited = images.slice(0, 6);
-    const userContent: Array<Record<string, unknown>> = [
-      { type: "text", text: "次の商品画像から指定スキーマのJSONだけを返してください。" },
-      ...limited.map((url) => ({ type: "image_url", image_url: { url } })),
+    const parts: Array<Record<string, unknown>> = [
+      { text: "次の商品画像から指定スキーマのJSONだけを返してください。" },
     ];
+    for (const url of limited) {
+      const parsed = parseDataUrl(url);
+      if (!parsed) continue;
+      parts.push({ inline_data: { mime_type: parsed.mime, data: parsed.data } });
+    }
 
-    const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+    const model = "gemini-2.0-flash";
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const aiRes = await fetch(endpoint, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userContent },
-        ],
-        temperature: 0.1,
+        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: [{ role: "user", parts }],
+        generationConfig: {
+          temperature: 0.1,
+          response_mime_type: "application/json",
+        },
       }),
     });
 
     if (!aiRes.ok) {
       const errText = await aiRes.text();
-      return new Response(JSON.stringify({ error: `OpenAI ${aiRes.status}: ${errText}` }), {
+      return new Response(JSON.stringify({ error: `Gemini ${aiRes.status}: ${errText}` }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const aiData = await aiRes.json();
-    const content = aiData?.choices?.[0]?.message?.content ?? "{}";
+    const text = aiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
     let parsed: Record<string, unknown> = {};
     try {
-      parsed = JSON.parse(content);
+      parsed = JSON.parse(text);
     } catch {
-      parsed = {};
+      const m = text.match(/\{[\s\S]*\}/);
+      if (m) {
+        try { parsed = JSON.parse(m[0]); } catch { /* noop */ }
+      }
     }
 
     return new Response(JSON.stringify(parsed), {

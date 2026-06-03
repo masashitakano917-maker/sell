@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Sparkles, LogOut, ClipboardList, Search as SearchIcon, Layers } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
@@ -13,6 +13,7 @@ import { PurchaseForm } from './components/PurchaseForm';
 import { JudgeResultCard } from './components/JudgeResultCard';
 import { Records } from './components/Records';
 import { MasterSearch } from './components/MasterSearch';
+import { CompSearch, type CompSearchData } from './components/CompSearch';
 import './styles.css';
 
 const rules = masterData as MasterRule[];
@@ -51,6 +52,11 @@ function App() {
   const [aiAvailable, setAiAvailable] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [compKeyword, setCompKeyword] = useState('');
+  const [compLoading, setCompLoading] = useState(false);
+  const [compData, setCompData] = useState<CompSearchData | null>(null);
+  const lastAutoKeyword = useRef<string>('');
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
@@ -70,6 +76,47 @@ function App() {
     () => findBestRule(rules, input.brand, input.itemType, input.category),
     [input.brand, input.itemType, input.category],
   );
+
+  useEffect(() => {
+    const parts = [input.brand, input.itemType, input.size].filter(Boolean);
+    const auto = parts.join(' ').trim();
+    setCompKeyword((prev) => (prev === '' || prev === lastAutoKeyword.current ? auto : prev));
+    lastAutoKeyword.current = auto;
+  }, [input.brand, input.itemType, input.size]);
+
+  async function searchComps() {
+    const kw = compKeyword.trim();
+    if (!kw) return;
+    setCompLoading(true);
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/search-comps`;
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ keyword: kw }),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || `HTTP ${res.status}`);
+      }
+      const data = (await res.json()) as CompSearchData;
+      setCompData(data);
+      const totalAvg = data.overall.average;
+      const totalCount = data.overall.count;
+      if (totalCount > 0) {
+        setInput((prev) => ({ ...prev, soldCompsCount: totalCount }));
+        setSaleOverride({ saleMin: totalAvg, saleMax: totalAvg, sampleCount: totalCount });
+        setUseActualSales(true);
+      }
+    } catch (e) {
+      alert(`売り切れ検索に失敗しました: ${(e as Error).message}`);
+    } finally {
+      setCompLoading(false);
+    }
+  }
 
   function onImages(fileList: FileList | null) {
     if (!fileList) return;
@@ -245,6 +292,13 @@ function App() {
             saleOverride={saleOverride}
             onSave={saveRecord}
             saving={saving}
+          />
+          <CompSearch
+            keyword={compKeyword}
+            onKeyword={setCompKeyword}
+            onSearch={searchComps}
+            loading={compLoading}
+            data={compData}
           />
         </main>
       )}
