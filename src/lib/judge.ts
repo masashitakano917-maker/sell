@@ -9,10 +9,20 @@ function includesAny(text: string, words: string[]): boolean {
   return words.some((w) => t.includes(w.toLowerCase()));
 }
 
-export function judgeProduct(rules: MasterRule[], input: ProductInput): JudgeResult {
+export type SaleOverride = {
+  saleMin: number;
+  saleMax: number;
+  sampleCount: number;
+};
+
+export function judgeProduct(
+  rules: MasterRule[],
+  input: ProductInput,
+  override?: SaleOverride | null,
+): JudgeResult {
   const rule = findBestRule(rules, input.brand, input.itemType, input.category);
-  const saleMin = toNumber(rule?.想定販売価格_min, 0);
-  const saleMax = toNumber(rule?.想定販売価格_max, saleMin);
+  const saleMin = override ? override.saleMin : toNumber(rule?.想定販売価格_min, 0);
+  const saleMax = override ? override.saleMax : toNumber(rule?.想定販売価格_max, saleMin);
   const maxBuy = toNumber(rule?.仕入れ上限_max, 0);
   const shipMin = input.expectedShipping || toNumber(rule?.想定送料_min, 230);
   const shipMax = input.expectedShipping || toNumber(rule?.想定送料_max, shipMin);
@@ -33,6 +43,10 @@ export function judgeProduct(rules: MasterRule[], input: ProductInput): JudgeRes
   } else {
     warnings.push('マスターに近いブランド・商品ルールが見つかりません。相場確認必須です。');
     score += 5;
+  }
+
+  if (override) {
+    reasons.push(`実売データ ${override.sampleCount}件で想定販売価格を補正：${override.saleMin.toLocaleString()}〜${override.saleMax.toLocaleString()}円`);
   }
 
   if (input.purchasePrice > 0 && maxBuy > 0) {
