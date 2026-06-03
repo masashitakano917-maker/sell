@@ -498,6 +498,27 @@ small { color: #7a8794; }
   text-overflow: ellipsis;
   color: var(--muted);
 }
+.comp-thumb {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #eee;
+}
+.match-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.badge-same { background: #d8f3df; color: #14793b; }
+.badge-similar { background: #fff3d6; color: #8a6500; }
+.badge-diff { background: #fde2e2; color: #a82424; }
+.badge-unknown { background: #e6e9ec; color: #5a6370; }
 
 @media (max-width: 960px) {
   .app { padding: 14px 14px 96px; }

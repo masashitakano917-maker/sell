@@ -55,6 +55,7 @@ function App() {
   const [compKeyword, setCompKeyword] = useState('');
   const [compLoading, setCompLoading] = useState(false);
   const [compData, setCompData] = useState<CompSearchData | null>(null);
+  const [compMatching, setCompMatching] = useState(false);
   const lastAutoKeyword = useRef<string>('');
 
   useEffect(() => {
@@ -115,6 +116,73 @@ function App() {
       alert(`売り切れ検索に失敗しました: ${(e as Error).message}`);
     } finally {
       setCompLoading(false);
+    }
+  }
+
+  async function matchComps() {
+    if (!compData || images.length === 0) return;
+    setCompMatching(true);
+    try {
+      const candidates = [
+        ...compData.mercari.items.map((it, i) => ({ id: `m_${i}`, thumbnail: it.thumbnail, title: it.title, site: 'mercari' as const, idx: i })),
+        ...compData.paypay.items.map((it, i) => ({ id: `p_${i}`, thumbnail: it.thumbnail, title: it.title, site: 'paypay' as const, idx: i })),
+      ].filter((c) => !!c.thumbnail);
+
+      if (candidates.length === 0) {
+        alert('サムネイル画像が無いため照合できません。');
+        return;
+      }
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/match-items`;
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reference: images,
+          candidates: candidates.map((c) => ({ id: c.id, thumbnail: c.thumbnail, title: c.title })),
+        }),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || `HTTP ${res.status}`);
+      }
+      const out = (await res.json()) as { matches: Array<{ id: string; candidateId?: string; level: 'same' | 'similar' | 'different' | 'unknown'; reason?: string }> };
+
+      const labelToCandidate = new Map<string, typeof candidates[number]>();
+      candidates.forEach((c, i) => labelToCandidate.set(`C${i + 1}`, c));
+
+      const next: CompSearchData = {
+        ...compData,
+        mercari: { ...compData.mercari, items: compData.mercari.items.map((it) => ({ ...it, match: undefined })) },
+        paypay: { ...compData.paypay, items: compData.paypay.items.map((it) => ({ ...it, match: undefined })) },
+      };
+
+      for (const m of out.matches) {
+        const cand = labelToCandidate.get(m.id);
+        if (!cand) continue;
+        const target = cand.site === 'mercari' ? next.mercari.items[cand.idx] : next.paypay.items[cand.idx];
+        if (target) target.match = { level: m.level, reason: m.reason };
+      }
+
+      setCompData(next);
+
+      const samePrices = [
+        ...next.mercari.items.filter((i) => i.match?.level === 'same').map((i) => i.price),
+        ...next.paypay.items.filter((i) => i.match?.level === 'same').map((i) => i.price),
+      ];
+      if (samePrices.length > 0) {
+        const avg = Math.round(samePrices.reduce((a, b) => a + b, 0) / samePrices.length);
+        setInput((prev) => ({ ...prev, soldCompsCount: samePrices.length }));
+        setSaleOverride({ saleMin: avg, saleMax: avg, sampleCount: samePrices.length });
+        setUseActualSales(true);
+      }
+    } catch (e) {
+      alert(`画像照合に失敗しました: ${(e as Error).message}`);
+    } finally {
+      setCompMatching(false);
     }
   }
 
@@ -299,6 +367,9 @@ function App() {
             onSearch={searchComps}
             loading={compLoading}
             data={compData}
+            hasReferenceImages={images.length > 0}
+            onMatch={matchComps}
+            matching={compMatching}
           />
         </main>
       )}

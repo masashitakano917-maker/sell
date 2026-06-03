@@ -1,8 +1,16 @@
 import React from 'react';
-import { Search, Loader as Loader2, ExternalLink } from 'lucide-react';
+import { Search, Loader as Loader2, ExternalLink, ScanSearch, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, Circle as XCircle, Circle as HelpCircle } from 'lucide-react';
 import { yen } from '../lib/number';
 
-export type CompItem = { title: string; price: number; url: string; thumbnail?: string };
+export type MatchLevel = 'same' | 'similar' | 'different' | 'unknown';
+export type CompItem = {
+  id?: string;
+  title: string;
+  price: number;
+  url: string;
+  thumbnail?: string;
+  match?: { level: MatchLevel; reason?: string };
+};
 export type CompSiteResult = { count: number; items: CompItem[]; average: number; searchUrl: string; error?: string };
 export type CompSearchData = {
   keyword: string;
@@ -17,9 +25,33 @@ type Props = {
   onSearch: () => void;
   loading: boolean;
   data: CompSearchData | null;
+  hasReferenceImages: boolean;
+  onMatch: () => void;
+  matching: boolean;
 };
 
+function MatchBadge({ match }: { match?: { level: MatchLevel; reason?: string } }) {
+  if (!match) return null;
+  const map = {
+    same: { label: '同一品', cls: 'badge-same', Icon: CheckCircle2 },
+    similar: { label: '類似', cls: 'badge-similar', Icon: AlertCircle },
+    different: { label: '別物', cls: 'badge-diff', Icon: XCircle },
+    unknown: { label: '不明', cls: 'badge-unknown', Icon: HelpCircle },
+  } as const;
+  const m = map[match.level] ?? map.unknown;
+  return (
+    <span className={`match-badge ${m.cls}`} title={match.reason ?? ''}>
+      <m.Icon size={12} /> {m.label}
+    </span>
+  );
+}
+
 function SiteBlock({ name, data }: { name: string; data: CompSiteResult }) {
+  const sameItems = data.items.filter((i) => i.match?.level === 'same');
+  const sameAvg = sameItems.length
+    ? Math.round(sameItems.reduce((s, i) => s + i.price, 0) / sameItems.length)
+    : 0;
+
   return (
     <div className="comp-site">
       <div className="comp-site-head">
@@ -33,13 +65,21 @@ function SiteBlock({ name, data }: { name: string; data: CompSiteResult }) {
         <div><span>売り切れ件数</span><strong>{data.count}件</strong></div>
         <div><span>平均値</span><strong>{yen(data.average)}</strong></div>
       </div>
+      {sameItems.length > 0 && (
+        <div className="comp-stat-row" style={{ background: '#e9f8ed', borderRadius: 8 }}>
+          <div><span>同一品</span><strong>{sameItems.length}件</strong></div>
+          <div><span>同一品平均</span><strong>{yen(sameAvg)}</strong></div>
+        </div>
+      )}
       {data.items.length > 0 ? (
         <ul className="comp-list">
           {data.items.slice(0, 10).map((it, i) => (
             <li key={i}>
               <a href={it.url} target="_blank" rel="noreferrer">
+                {it.thumbnail && <img src={it.thumbnail} alt="" className="comp-thumb" loading="lazy" />}
                 <span className="comp-price">{yen(it.price)}</span>
                 <span className="comp-title">{it.title || it.url}</span>
+                <MatchBadge match={it.match} />
                 <ExternalLink size={12} />
               </a>
             </li>
@@ -52,7 +92,7 @@ function SiteBlock({ name, data }: { name: string; data: CompSiteResult }) {
   );
 }
 
-export function CompSearch({ keyword, onKeyword, onSearch, loading, data }: Props) {
+export function CompSearch({ keyword, onKeyword, onSearch, loading, data, hasReferenceImages, onMatch, matching }: Props) {
   return (
     <section className="card">
       <h2>売り切れ相場検索</h2>
@@ -75,7 +115,20 @@ export function CompSearch({ keyword, onKeyword, onSearch, loading, data }: Prop
           <div className="comp-overall">
             <div><span>合計売り切れ</span><strong>{data.overall.count}件</strong></div>
             <div><span>全体平均</span><strong>{yen(data.overall.average)}</strong></div>
+            <button
+              className="btn btn-ghost"
+              onClick={onMatch}
+              disabled={matching || !hasReferenceImages || data.overall.count === 0}
+              title={!hasReferenceImages ? '先に商品画像をアップロードしてください' : ''}
+              style={{ marginLeft: 'auto' }}
+            >
+              {matching ? <Loader2 className="spin" size={16} /> : <ScanSearch size={16} />}
+              {matching ? 'AI画像照合中...' : 'AIで同一品を判定'}
+            </button>
           </div>
+          {!hasReferenceImages && (
+            <p className="hint">画像で同一品を判定するには、先に商品入力で写真をアップロード／撮影してください。</p>
+          )}
           <div className="comp-grid">
             <SiteBlock name="メルカリ" data={data.mercari} />
             <SiteBlock name="PayPay フリマ" data={data.paypay} />

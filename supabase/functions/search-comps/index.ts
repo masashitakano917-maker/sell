@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
-type CompItem = { title: string; price: number; url: string; thumbnail?: string };
+type CompItem = { id: string; title: string; price: number; url: string; thumbnail?: string };
 type CompResult = { count: number; items: CompItem[]; average: number; searchUrl: string; error?: string };
 
 function average(nums: number[]): number {
@@ -68,11 +68,14 @@ async function searchMercari(keyword: string): Promise<CompResult> {
           if (!/^m\d+$/.test(id) && !/^\d+$/.test(id)) continue;
           const price = typeof it.price === "number" ? it.price : parseInt(String(it.price), 10);
           if (!Number.isFinite(price) || price <= 0) continue;
+          const itemId = id.startsWith("m") ? id : "m" + id;
+          const thumb = typeof it.thumbnails?.[0] === "string" ? it.thumbnails[0] : `https://static.mercdn.net/c!/w=240/thumb/photos/${itemId}_1.jpg`;
           items.push({
+            id: itemId,
             title: String(it.name ?? it.title ?? ""),
             price,
-            url: `https://jp.mercari.com/item/${id.startsWith("m") ? id : "m" + id}`,
-            thumbnail: typeof it.thumbnails?.[0] === "string" ? it.thumbnails[0] : undefined,
+            url: `https://jp.mercari.com/item/${itemId}`,
+            thumbnail: thumb,
           });
         }
         if (items.length > 0) break;
@@ -89,7 +92,13 @@ async function searchMercari(keyword: string): Promise<CompResult> {
         seen.add(id);
         const price = parseInt(m[2].replace(/,/g, ""), 10);
         if (!Number.isFinite(price)) continue;
-        items.push({ title: "", price, url: `https://jp.mercari.com/item/${id}` });
+        items.push({
+          id,
+          title: "",
+          price,
+          url: `https://jp.mercari.com/item/${id}`,
+          thumbnail: `https://static.mercdn.net/c!/w=240/thumb/photos/${id}_1.jpg`,
+        });
       }
     }
 
@@ -133,6 +142,7 @@ async function searchPayPayFlea(keyword: string): Promise<CompResult> {
           const price = typeof it.price === "number" ? it.price : parseInt(String(it.price), 10);
           if (!Number.isFinite(price) || price <= 0) continue;
           items.push({
+            id,
             title: String(it.name ?? it.title ?? ""),
             price,
             url: `https://paypayfleamarket.yahoo.co.jp/item/${id}`,
@@ -153,7 +163,7 @@ async function searchPayPayFlea(keyword: string): Promise<CompResult> {
         seen.add(id);
         const price = parseInt(m[2].replace(/,/g, ""), 10);
         if (!Number.isFinite(price)) continue;
-        items.push({ title: "", price, url: `https://paypayfleamarket.yahoo.co.jp/item/${id}` });
+        items.push({ id, title: "", price, url: `https://paypayfleamarket.yahoo.co.jp/item/${id}` });
       }
     }
 
