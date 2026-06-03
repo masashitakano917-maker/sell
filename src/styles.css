@@ -248,6 +248,36 @@ select, input[list] {
 .matched p { margin: 4px 0; font-size: 14px; }
 .matched-none { background: #fff7ed; border-color: #fed7aa; }
 .matched-none h3 { color: #c2410c; }
+.matched-partial { background: #eff6ff; border-color: #bfdbfe; }
+.matched-partial h3 { color: #1d4ed8; }
+.coverage-list { list-style: none; padding-left: 0; margin: 8px 0; }
+.coverage-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: white;
+  margin: 4px 0;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #e5e7eb;
+  color: #374151;
+}
+.badge.prio-S { background: #fee2e2; color: #b91c1c; }
+.badge.prio-A { background: #fef3c7; color: #b45309; }
+.badge.prio-B { background: #dbeafe; color: #1d4ed8; }
+.badge.prio-C { background: #e5e7eb; color: #4b5563; }
+.cov-type { font-weight: 700; }
+.cov-aim { color: var(--muted); font-size: 12px; }
+.mt-8 { margin-top: 8px; }
 
 ul { padding-left: 20px; margin: 8px 0; }
 li { margin: 6px 0; font-size: 14px; line-height: 1.5; }

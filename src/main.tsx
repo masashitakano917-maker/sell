@@ -4,7 +4,7 @@ import { Sparkles, LogOut, ClipboardList, Search as SearchIcon, Layers } from 'l
 import type { Session } from '@supabase/supabase-js';
 import masterData from './data/master.json';
 import type { MasterRule, ProductInput } from './types';
-import { findBestRule } from './lib/search';
+import { findBestRule, getBrandCoverage } from './lib/search';
 import { judgeProduct, type SaleOverride } from './lib/judge';
 import { fetchSaleOverride } from './lib/sales';
 import { supabase } from './lib/supabase';
@@ -76,6 +76,10 @@ function App() {
   const bestRule = useMemo(
     () => findBestRule(rules, input.brand, input.itemType, input.category),
     [input.brand, input.itemType, input.category],
+  );
+  const brandCoverage = useMemo(
+    () => getBrandCoverage(rules, input.brand, input.itemType),
+    [input.brand, input.itemType],
   );
 
   useEffect(() => {
@@ -356,6 +360,7 @@ function App() {
           <JudgeResultCard
             result={result}
             bestRule={bestRule}
+            brandCoverage={brandCoverage}
             useActualSales={useActualSales}
             onToggleActualSales={toggleActualSales}
             onApplyActualSales={applyActualSales}

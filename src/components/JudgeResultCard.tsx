@@ -2,11 +2,13 @@ import React from 'react';
 import { ExternalLink, RefreshCw, Save, Loader as Loader2 } from 'lucide-react';
 import type { JudgeResult, MasterRule } from '../types';
 import type { SaleOverride } from '../lib/judge';
+import type { BrandCoverage } from '../lib/search';
 import { yen } from '../lib/number';
 
 type Props = {
   result: JudgeResult;
   bestRule: MasterRule | undefined;
+  brandCoverage?: BrandCoverage;
   useActualSales: boolean;
   onToggleActualSales: (next: boolean) => void;
   onApplyActualSales: () => void;
@@ -19,6 +21,7 @@ type Props = {
 export function JudgeResultCard({
   result,
   bestRule,
+  brandCoverage,
   useActualSales,
   onToggleActualSales,
   onApplyActualSales,
@@ -81,10 +84,30 @@ export function JudgeResultCard({
           <p>{bestRule['商品名・狙い目']}</p>
           <p>優先度：{bestRule.優先度} / 仕入れ上限：{bestRule.仕入れ上限} / 販売目安：{bestRule.想定販売価格}</p>
         </div>
+      ) : brandCoverage ? (
+        <div className="matched matched-partial">
+          <h3>マスター部分一致</h3>
+          <p>
+            <b>{brandCoverage.brandLabel}</b> はマスターに登録あり。ただし指定の服種類のデータはありません。
+          </p>
+          <p className="hint">登録されている服種類：</p>
+          <ul className="coverage-list">
+            {brandCoverage.availableItemTypes.map((it) => (
+              <li key={it.itemType}>
+                <span className={`badge prio-${it.priority || 'X'}`}>優先度 {it.priority || '-'}</span>
+                <span className="cov-type">{it.itemType}</span>
+                {it.aim && <span className="cov-aim">／ {it.aim}</span>}
+              </li>
+            ))}
+          </ul>
+          <p className="hint mt-8">
+            この服種類は実売相場で判定が必要です。「メルカリ・PayPayで売り切れ検索」を実行し、写真と商品詳細を入力してください。
+          </p>
+        </div>
       ) : (
         <div className="matched matched-none">
           <h3>マスター対象外</h3>
-          <p className="hint">このブランド×服種類の組み合わせはマスターに登録されていません。判定スコアは一般ロジックのみで算出しています。</p>
+          <p className="hint">このブランドはマスターに登録されていません。実売相場をもとに判定します。先に売り切れ検索を実行し、写真と商品詳細を入力してください。</p>
         </div>
       )}
 

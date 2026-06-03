@@ -17,6 +17,45 @@ function average(nums: number[]): number {
   return Math.round(sum / nums.length);
 }
 
+function b64url(buf: ArrayBuffer | Uint8Array): string {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/=+$/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
+
+function jsonB64url(obj: unknown): string {
+  return b64url(new TextEncoder().encode(JSON.stringify(obj)));
+}
+
+async function generateDpop(url: string, method: string): Promise<string> {
+  const keyPair = await crypto.subtle.generateKey(
+    { name: "ECDSA", namedCurve: "P-256" },
+    true,
+    ["sign", "verify"],
+  ) as CryptoKeyPair;
+
+  const pub = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+  const jwk = { kty: pub.kty, crv: pub.crv, x: pub.x, y: pub.y };
+
+  const header = { typ: "dpop+jwt", alg: "ES256", jwk };
+  const payload = {
+    iat: Math.floor(Date.now() / 1000),
+    jti: crypto.randomUUID(),
+    htu: url,
+    htm: method,
+    uuid: crypto.randomUUID(),
+  };
+
+  const signingInput = `${jsonB64url(header)}.${jsonB64url(payload)}`;
+  const sig = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    keyPair.privateKey,
+    new TextEncoder().encode(signingInput),
+  );
+  return `${signingInput}.${b64url(sig)}`;
+}
+
 function extractNextData(html: string): unknown | null {
   const m = html.match(/<script[^>]+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
   if (!m) return null;
@@ -42,72 +81,121 @@ async function searchMercari(keyword: string): Promise<CompResult> {
     order: "desc",
   });
   const searchUrl = `https://jp.mercari.com/search?${params.toString()}`;
+
   try {
-    const res = await fetch(searchUrl, {
+    const apiUrl = "https://api.mercari.jp/v2/entities:search";
+    const dpop = await generateDpop(apiUrl, "POST");
+    const apiRes = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "DPoP": dpop,
+        "X-Platform": "web",
+        "Accept": "*/*",
+        "Accept-Language": "ja-JP,ja;q=0.9",
+        "Content-Type": "application/json; charset=utf-8",
+        "Origin": "https://jp.mercari.com",
+        "Referer": "https://jp.mercari.com/",
+        "User-Agent": UA,
+      },
+      body: JSON.stringify({
+        userId: "",
+        pageSize: 30,
+        pageToken: "",
+        searchSessionId: crypto.randomUUID(),
+        indexRouting: "INDEX_ROUTING_UNSPECIFIED",
+        thumbnailTypes: [],
+        searchCondition: {
+          keyword,
+          excludeKeyword: "",
+          sort: "SORT_CREATED_TIME",
+          order: "ORDER_DESC",
+          status: ["STATUS_SOLD_OUT", "STATUS_TRADING"],
+          sizeId: [],
+          categoryId: [],
+          brandId: [],
+          sellerId: [],
+          priceMin: 0,
+          priceMax: 0,
+          itemConditionId: [],
+          shippingPayerId: [],
+          shippingFromArea: [],
+          shippingMethod: [],
+          colorId: [],
+          hasCoupon: false,
+          attributes: [],
+          itemTypes: [],
+          skuIds: [],
+        },
+        defaultDatasets: ["DATASET_TYPE_MERCARI"],
+        serviceFrom: "suruga",
+        withItemBrand: true,
+        withItemSize: false,
+        withItemPromotions: false,
+        withItemSizes: false,
+        withShopName: false,
+      }),
+    });
+
+    if (apiRes.ok) {
+      const json = await apiRes.json() as { items?: Array<Record<string, unknown>> };
+      const items: CompItem[] = [];
+      for (const it of json.items ?? []) {
+        const id = String(it.id ?? "");
+        if (!id) continue;
+        const priceRaw = it.price;
+        const price = typeof priceRaw === "number" ? priceRaw : parseInt(String(priceRaw), 10);
+        if (!Number.isFinite(price) || price <= 0) continue;
+        const thumbnails = it.thumbnails as Array<string> | undefined;
+        const thumb = thumbnails?.[0] || `https://static.mercdn.net/c!/w=240/thumb/photos/${id}_1.jpg`;
+        items.push({
+          id,
+          title: String(it.name ?? ""),
+          price,
+          url: `https://jp.mercari.com/item/${id}`,
+          thumbnail: thumb,
+        });
+      }
+      const top = items.slice(0, 20);
+      return {
+        count: items.length,
+        items: top,
+        average: average(top.map((i) => i.price)),
+        searchUrl,
+      };
+    }
+
+    const html = await (await fetch(searchUrl, {
       headers: {
         "User-Agent": UA,
         "Accept": "text/html,application/xhtml+xml",
         "Accept-Language": "ja-JP,ja;q=0.9",
       },
-    });
-    if (!res.ok) return { count: 0, items: [], average: 0, searchUrl, error: `Mercari ${res.status}` };
-    const html = await res.text();
-
+    })).text();
     const items: CompItem[] = [];
-
-    const nextData = extractNextData(html);
-    if (nextData) {
-      const candidates = deepFindArray(nextData, (it) =>
-        it && typeof it === "object" && typeof it.id === "string" &&
-        (typeof it.price === "number" || typeof it.price === "string") &&
-        (typeof it.name === "string" || typeof it.title === "string"),
-      );
-      for (const arr of candidates) {
-        for (const it of arr) {
-          const id = String(it.id);
-          if (!/^m\d+$/.test(id) && !/^\d+$/.test(id)) continue;
-          const price = typeof it.price === "number" ? it.price : parseInt(String(it.price), 10);
-          if (!Number.isFinite(price) || price <= 0) continue;
-          const itemId = id.startsWith("m") ? id : "m" + id;
-          const thumb = typeof it.thumbnails?.[0] === "string" ? it.thumbnails[0] : `https://static.mercdn.net/c!/w=240/thumb/photos/${itemId}_1.jpg`;
-          items.push({
-            id: itemId,
-            title: String(it.name ?? it.title ?? ""),
-            price,
-            url: `https://jp.mercari.com/item/${itemId}`,
-            thumbnail: thumb,
-          });
-        }
-        if (items.length > 0) break;
-      }
+    const re = /\/item\/(m\d+)[^"]*"[^>]*>[\s\S]{0,400}?¥\s*([\d,]+)/g;
+    let m;
+    const seen = new Set<string>();
+    while ((m = re.exec(html)) !== null && items.length < 30) {
+      const id = m[1];
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const price = parseInt(m[2].replace(/,/g, ""), 10);
+      if (!Number.isFinite(price)) continue;
+      items.push({
+        id,
+        title: "",
+        price,
+        url: `https://jp.mercari.com/item/${id}`,
+        thumbnail: `https://static.mercdn.net/c!/w=240/thumb/photos/${id}_1.jpg`,
+      });
     }
-
-    if (items.length === 0) {
-      const re = /\/item\/(m\d+)[^"]*"[^>]*>[\s\S]{0,400}?¥\s*([\d,]+)/g;
-      let m;
-      const seen = new Set<string>();
-      while ((m = re.exec(html)) !== null && items.length < 30) {
-        const id = m[1];
-        if (seen.has(id)) continue;
-        seen.add(id);
-        const price = parseInt(m[2].replace(/,/g, ""), 10);
-        if (!Number.isFinite(price)) continue;
-        items.push({
-          id,
-          title: "",
-          price,
-          url: `https://jp.mercari.com/item/${id}`,
-          thumbnail: `https://static.mercdn.net/c!/w=240/thumb/photos/${id}_1.jpg`,
-        });
-      }
-    }
-
     const top = items.slice(0, 20);
     return {
       count: items.length,
       items: top,
       average: average(top.map((i) => i.price)),
       searchUrl,
+      error: items.length === 0 ? `Mercari API ${apiRes.status}` : undefined,
     };
   } catch (e) {
     return { count: 0, items: [], average: 0, searchUrl, error: (e as Error).message };

@@ -54,3 +54,49 @@ export function filterRules(rules: MasterRule[], query: string): MasterRule[] {
     r.検索キーワード,
   ].join(' ')).includes(q)).slice(0, 100);
 }
+
+export type BrandCoverage = {
+  brandLabel: string;
+  hasItemTypeMatch: boolean;
+  availableItemTypes: Array<{ itemType: string; priority: string; aim: string }>;
+};
+
+export function getBrandCoverage(
+  rules: MasterRule[],
+  brand: string,
+  itemType: string,
+): BrandCoverage | undefined {
+  const b = norm(brand);
+  if (!b) return undefined;
+  const t = norm(itemType);
+
+  const brandRules = rules.filter((r) => {
+    const rb = norm(r.ブランド);
+    const rbjp = norm(r.ブランド日本語);
+    return rb.includes(b) || b.includes(rb) || rbjp.includes(b) || b.includes(rbjp);
+  });
+  if (brandRules.length === 0) return undefined;
+
+  const seen = new Map<string, { itemType: string; priority: string; aim: string }>();
+  for (const r of brandRules) {
+    if (!r.服種類) continue;
+    const key = r.服種類;
+    if (!seen.has(key)) {
+      seen.set(key, {
+        itemType: r.服種類,
+        priority: r.優先度 ?? '',
+        aim: r['商品名・狙い目'] ?? '',
+      });
+    }
+  }
+
+  const hasItemTypeMatch = !!t && brandRules.some((r) => norm(r.服種類 + ' ' + r['商品名・狙い目']).includes(t));
+  const sample = brandRules[0];
+  const brandLabel = sample.ブランド日本語 || sample.ブランド;
+
+  return {
+    brandLabel,
+    hasItemTypeMatch,
+    availableItemTypes: Array.from(seen.values()),
+  };
+}
