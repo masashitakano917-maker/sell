@@ -42,6 +42,9 @@ export function JudgeResultCard({
           <p className="decision">{result.decision}</p>
           <p>想定販売：{yen(result.estimatedSaleMin)}〜{yen(result.estimatedSaleMax)}</p>
           <p>想定粗利：{yen(result.estimatedProfitMin)}〜{yen(result.estimatedProfitMax)}</p>
+          {result.suggestedMaxBuy !== undefined && result.suggestedMaxBuy > 0 && (
+            <p className="suggested-max">仕入れ上限目安：<b>{yen(result.suggestedMaxBuy)}</b></p>
+          )}
         </div>
       </div>
 

@@ -349,6 +349,9 @@ function App() {
             onAnalyzeImages={analyzeImages}
             analyzing={analyzing}
             aiAvailable={aiAvailable}
+            onSearchComps={searchComps}
+            searching={compLoading}
+            canSearchComps={!!compKeyword.trim()}
           />
           <JudgeResultCard
             result={result}

@@ -96,6 +96,7 @@ export type JudgeResult = {
   estimatedSaleMax: number;
   estimatedProfitMin: number;
   estimatedProfitMax: number;
+  suggestedMaxBuy?: number;
   reasons: string[];
   warnings: string[];
   nextActions: string[];

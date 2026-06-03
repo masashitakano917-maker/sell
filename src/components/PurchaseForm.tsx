@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, Sparkles, Loader as Loader2 } from 'lucide-react';
+import { Camera, Sparkles, Loader as Loader2, Search } from 'lucide-react';
 import type { ProductInput } from '../types';
 import { CATEGORIES, ITEM_TYPES, BRANDS, CONDITIONS, sizesForCategory } from '../lib/options';
 
@@ -11,6 +11,9 @@ type Props = {
   onAnalyzeImages: () => void;
   analyzing: boolean;
   aiAvailable: boolean;
+  onSearchComps: () => void;
+  searching: boolean;
+  canSearchComps: boolean;
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -22,7 +25,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export function PurchaseForm({ input, onChange, images, onImages, onAnalyzeImages, analyzing, aiAvailable }: Props) {
+export function PurchaseForm({ input, onChange, images, onImages, onAnalyzeImages, analyzing, aiAvailable, onSearchComps, searching, canSearchComps }: Props) {
   function update<K extends keyof ProductInput>(key: K, value: ProductInput[K]) {
     onChange({ ...input, [key]: value });
   }
@@ -123,19 +126,7 @@ export function PurchaseForm({ input, onChange, images, onImages, onAnalyzeImage
               />
             </label>
           </div>
-          {images.length > 0 && (
-            <button
-              type="button"
-              className="btn btn-primary mt-12"
-              onClick={onAnalyzeImages}
-              disabled={analyzing || !aiAvailable}
-              title={!aiAvailable ? 'GEMINI_API_KEY 未設定' : ''}
-            >
-              {analyzing ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
-              {analyzing ? 'AI解析中...' : 'AIで自動入力'}
-            </button>
-          )}
-          {!aiAvailable && images.length > 0 && (
+          {images.length > 0 && !aiAvailable && (
             <p className="hint">画像AIを使うにはエッジ関数に GEMINI_API_KEY を設定してください。</p>
           )}
         </div>
@@ -145,6 +136,29 @@ export function PurchaseForm({ input, onChange, images, onImages, onAnalyzeImage
           {images.map((src, i) => <img key={i} src={src} alt="" />)}
         </div>
       )}
+
+      <div className="action-bar">
+        <button
+          type="button"
+          className="btn btn-primary btn-action"
+          onClick={onAnalyzeImages}
+          disabled={analyzing || !aiAvailable || images.length === 0}
+          title={images.length === 0 ? '先に写真をアップロードしてください' : ''}
+        >
+          {analyzing ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
+          {analyzing ? 'AI解析中...' : 'AIで自動入力'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-search btn-action"
+          onClick={onSearchComps}
+          disabled={searching || !canSearchComps}
+          title={!canSearchComps ? 'ブランドや服種類を入力してください' : ''}
+        >
+          {searching ? <Loader2 className="spin" size={18} /> : <Search size={18} />}
+          {searching ? '検索中...' : 'メルカリ・PayPayで売り切れ検索'}
+        </button>
+      </div>
     </section>
   );
 }

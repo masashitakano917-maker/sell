@@ -33,6 +33,13 @@ export function judgeProduct(
   const warnings: string[] = [];
   const nextActions: string[] = [];
 
+  const saleAvg = (saleMin + saleMax) / 2;
+  const targetProfit = 2500;
+  const noRuleSuggestedMaxBuy =
+    !rule && saleAvg > 0
+      ? Math.max(0, Math.floor(saleAvg * 0.9 - shipMax - targetProfit))
+      : 0;
+
   let score = 0;
   if (rule) {
     score += priorityBase[rule.優先度] ?? 8;
@@ -40,8 +47,18 @@ export function judgeProduct(
     score += Math.min(15, Math.max(0, toNumber(rule.ジャンルスコア, 0) / 7));
     reasons.push(`${rule.ブランド日本語 || rule.ブランド} / ${rule.服種類} のマスターに一致`);
     reasons.push(`優先度 ${rule.優先度}：${rule['商品名・狙い目']}`);
+  } else if (override && override.sampleCount >= 3 && saleAvg > 0) {
+    score += 18;
+    reasons.push(
+      `マスターには未登録ですが、実売データ ${override.sampleCount}件・平均 ${Math.round(saleAvg).toLocaleString()}円から相場ベースで判定します`,
+    );
+    if (noRuleSuggestedMaxBuy > 0) {
+      reasons.push(
+        `相場平均から逆算した仕入れ上限目安：${noRuleSuggestedMaxBuy.toLocaleString()}円（粗利${targetProfit.toLocaleString()}円確保ベース）`,
+      );
+    }
   } else {
-    warnings.push('マスターに近いブランド・商品ルールが見つかりません。相場確認必須です。');
+    warnings.push('マスター対象外で、売り切れ実売データもまだ無いため判定の信頼度は低いです。先に売り切れ相場検索を実行してください。');
     score += 5;
   }
 
@@ -56,6 +73,14 @@ export function judgeProduct(
     } else {
       score -= 20;
       warnings.push(`仕入れ値が上限目安 ${maxBuy.toLocaleString()}円を超えています`);
+    }
+  } else if (input.purchasePrice > 0 && noRuleSuggestedMaxBuy > 0) {
+    if (input.purchasePrice <= noRuleSuggestedMaxBuy) {
+      score += 18;
+      reasons.push(`仕入れ値が相場ベース上限 ${noRuleSuggestedMaxBuy.toLocaleString()}円以内`);
+    } else {
+      score -= 22;
+      warnings.push(`仕入れ値が相場ベース上限 ${noRuleSuggestedMaxBuy.toLocaleString()}円を超えています`);
     }
   }
 
@@ -127,6 +152,7 @@ export function judgeProduct(
     estimatedSaleMax: saleMax,
     estimatedProfitMin: profitMin,
     estimatedProfitMax: profitMax,
+    suggestedMaxBuy: maxBuy > 0 ? maxBuy : noRuleSuggestedMaxBuy > 0 ? noRuleSuggestedMaxBuy : undefined,
     reasons,
     warnings,
     nextActions,
