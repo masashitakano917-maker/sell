@@ -23,8 +23,9 @@ export function Auth() {
   return (
     <div className="auth-wrap">
       <div className="auth-card">
-        <h1>Sedori AI Judge</h1>
-        <p className="muted">{mode === 'signin' ? 'ログインして仕入れ判定を始める' : 'アカウントを作成'}</p>
+        <p className="eyebrow" style={{ marginBottom: 12 }}>SEDORI AI</p>
+        <h1>Sedori&nbsp;<em>Judge</em></h1>
+        <p className="muted" style={{ marginTop: 8 }}>{mode === 'signin' ? 'ログインして仕入れ判定を始める' : 'アカウントを作成'}</p>
         <form onSubmit={submit} className="auth-form">
           <label>
             <span>メールアドレス</span>

@@ -468,14 +468,13 @@ function App() {
     <div className="app">
       <header className="hero">
         <div>
-          <p className="eyebrow">Sedori AI Judge</p>
-          <h1>店舗せどり仕入れ判定</h1>
-          <p className="hero-sub">v4マスター {rules.length}件＋自分の実売データで仕入れ判定。</p>
+          <p className="eyebrow">SEDORI AI / VOL.04</p>
+          <h1>Sedori&nbsp;<em>Judge</em></h1>
+          <p>店舗せどりの仕入れを、マスター{rules.length}件と実売データの両軸で評価する。</p>
         </div>
         <div className="hero-right">
-          <Sparkles size={40} />
           <button className="btn btn-ghost-light" onClick={() => supabase.auth.signOut()}>
-            <LogOut size={16} /> ログアウト
+            <LogOut size={14} /> ログアウト
           </button>
         </div>
       </header>
