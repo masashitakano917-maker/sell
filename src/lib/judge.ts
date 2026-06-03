@@ -83,7 +83,7 @@ export function judgeProduct(
   if (override) {
     if (blended) {
       reasons.push(
-        `マスター想定 ${masterMin.toLocaleString()}〜${masterMax.toLocaleString()}円 と 実売 ${override.sampleCount}件平均 ${Math.round((override.saleMin + override.saleMax) / 2).toLocaleString()}円 を統合：${saleMin.toLocaleString()}〜${saleMax.toLocaleString()}円`,
+        `ハイブリッド判定：マスター想定 ${masterMin.toLocaleString()}〜${masterMax.toLocaleString()}円 と 実売 ${override.sampleCount}件平均 ${Math.round((override.saleMin + override.saleMax) / 2).toLocaleString()}円 を合算 → ${saleMin.toLocaleString()}〜${saleMax.toLocaleString()}円`,
       );
     } else {
       reasons.push(`実売データ ${override.sampleCount}件で想定販売価格を補正：${override.saleMin.toLocaleString()}〜${override.saleMax.toLocaleString()}円`);

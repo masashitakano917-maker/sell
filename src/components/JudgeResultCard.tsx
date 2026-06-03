@@ -46,8 +46,8 @@ export function JudgeResultCard({
       {judgeMode && (
         <div className={`mode-pill mode-${judgeMode}`}>
           {judgeMode === 'master' && 'パターン1：マスタールール判定'}
-          {judgeMode === 'comps' && 'パターン2：実売相場ベース判定（画像＋入力）'}
-          {judgeMode === 'blended' && 'パターン1＋2：マスター × 実売相場の統合判定'}
+          {judgeMode === 'blended' && 'パターン2：ハイブリッド判定（パターン1 ＋ 画像 ＋ 売り切れ相場）'}
+          {judgeMode === 'comps' && 'パターン2：ハイブリッド判定（マスター対象外のため画像＋売り切れ相場のみ）'}
         </div>
       )}
 
