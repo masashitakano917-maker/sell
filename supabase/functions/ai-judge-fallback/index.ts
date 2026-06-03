@@ -89,7 +89,7 @@ Deno.serve(async (req: Request) => {
 メルカリ・Yahoo!フリマの売り切れ検索が0件、本アプリのマスタールールも該当なし。
 公開情報・一般的な中古相場感から、独自のAI参考判断を返してください。`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${apiKey}`;
     const res = await fetch(geminiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -152,7 +152,7 @@ Deno.serve(async (req: Request) => {
 - 迷ったら "different" ではなく "same" または "similar" を選ぶ。`,
     });
 
-    const model = "gemini-2.5-flash";
+    const model = "gemini-3-flash";
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const aiRes = await fetch(endpoint, {
