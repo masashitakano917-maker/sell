@@ -52,6 +52,23 @@ function SiteBlock({ name, data }: { name: string; data: CompSiteResult }) {
     ? Math.round(sameItems.reduce((s, i) => s + i.price, 0) / sameItems.length)
     : 0;
 
+  const rank: Record<MatchLevel | 'none', number> = {
+    same: 4,
+    similar: 3,
+    unknown: 2,
+    different: 1,
+    none: 0,
+  };
+  const sortedItems = data.items
+    .map((it, idx) => ({ it, idx }))
+    .sort((a, b) => {
+      const ra = rank[a.it.match?.level ?? 'none'];
+      const rb = rank[b.it.match?.level ?? 'none'];
+      if (rb !== ra) return rb - ra;
+      return a.idx - b.idx;
+    })
+    .map((x) => x.it);
+
   return (
     <div className="comp-site">
       <div className="comp-site-head">
@@ -73,7 +90,7 @@ function SiteBlock({ name, data }: { name: string; data: CompSiteResult }) {
       )}
       {data.items.length > 0 ? (
         <ul className="comp-list">
-          {data.items.slice(0, 10).map((it, i) => (
+          {sortedItems.slice(0, 10).map((it, i) => (
             <li key={i}>
               <a href={it.url} target="_blank" rel="noreferrer">
                 {it.thumbnail && <img src={it.thumbnail} alt="" className="comp-thumb" loading="lazy" />}

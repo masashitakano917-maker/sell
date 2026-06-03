@@ -16,6 +16,17 @@ import { MasterSearch } from './components/MasterSearch';
 import { CompSearch, type CompSearchData } from './components/CompSearch';
 import './styles.css';
 
+type AiFallback = {
+  estimatedSaleMin: number;
+  estimatedSaleMax: number;
+  decision: string;
+  confidence: 'low' | 'medium' | 'high' | string;
+  reasoning: string;
+  sources: string[];
+  risks: string[];
+  recommendation: string;
+};
+
 const rules = masterData as MasterRule[];
 
 const emptyInput: ProductInput = {
@@ -59,6 +70,9 @@ function App() {
   const [compData, setCompData] = useState<CompSearchData | null>(null);
   const [compMatching, setCompMatching] = useState(false);
   const lastAutoKeyword = useRef<string>('');
+
+  const [aiFallback, setAiFallback] = useState<AiFallback | null>(null);
+  const [aiFallbackLoading, setAiFallbackLoading] = useState(false);
 
   const [targetProfit, setTargetProfit] = useState<number>(2500);
   const [targetProfitDraft, setTargetProfitDraft] = useState<string>('2500');
@@ -177,7 +191,9 @@ function App() {
       const totalCount = data.overall.count;
       if (totalCount > 0) {
         setInput((prev) => ({ ...prev, soldCompsCount: totalCount }));
-        setSaleOverride({ saleMin: totalAvg, saleMax: totalAvg, sampleCount: totalCount });
+        const lo = Math.round(totalAvg * 0.85);
+        const hi = Math.round(totalAvg * 1.15);
+        setSaleOverride({ saleMin: lo, saleMax: hi, sampleCount: totalCount });
         setUseActualSales(true);
       }
     } catch (e) {
@@ -342,6 +358,7 @@ function App() {
     setSaleOverride(null);
     setUseActualSales(false);
     setCompKeyword(kw);
+    setAiFallback(null);
 
     try {
       const verify = await verifyImagesOnly();
@@ -370,10 +387,18 @@ function App() {
             if (m) {
               setCompData(m.data);
               if (m.sameCount > 0) {
-                override = { saleMin: m.sameMin, saleMax: m.sameMax, sampleCount: m.sameCount };
+                let lo = m.sameMin;
+                let hi = m.sameMax;
+                if (hi <= lo) {
+                  lo = Math.round(lo * 0.9);
+                  hi = Math.round(hi * 1.1);
+                }
+                override = { saleMin: lo, saleMax: hi, sampleCount: m.sameCount };
                 notes.push(`画像照合：同一商品 ${m.sameCount}件 / 平均 ${m.sameAvg.toLocaleString()}円（範囲 ${m.sameMin.toLocaleString()}〜${m.sameMax.toLocaleString()}円）`);
               } else if (m.similarCount > 0) {
-                override = { saleMin: m.similarAvg, saleMax: m.similarAvg, sampleCount: m.similarCount };
+                const lo = Math.round(m.similarAvg * 0.85);
+                const hi = Math.round(m.similarAvg * 1.15);
+                override = { saleMin: lo, saleMax: hi, sampleCount: m.similarCount };
                 notes.push(`画像照合：同一なし／類似（色違い等）${m.similarCount}件 / 平均 ${m.similarAvg.toLocaleString()}円 を参考値として採用`);
               } else {
                 notes.push('画像照合：同一・類似品なし。検索結果は無関係と判定。相場は使用しません。');
@@ -387,7 +412,11 @@ function App() {
         } else if (totalCount > 0 && images.length === 0) {
           notes.push('画像未アップロードのため、検索結果との照合をスキップしました。相場の信頼度は低めです。');
           const avg = comp.overall.average;
-          if (avg > 0) override = { saleMin: avg, saleMax: avg, sampleCount: totalCount };
+          if (avg > 0) {
+            const lo = Math.round(avg * 0.85);
+            const hi = Math.round(avg * 1.15);
+            override = { saleMin: lo, saleMax: hi, sampleCount: totalCount };
+          }
         }
       }
 
@@ -398,6 +427,41 @@ function App() {
       }
 
       setImageNotes(notes);
+
+      const noComps = !comp || comp.overall.count === 0;
+      if (!bestRule && noComps) {
+        setAiFallbackLoading(true);
+        try {
+          const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-judge-fallback`;
+          const res = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              brand: input.brand,
+              itemType: input.itemType,
+              category: input.category,
+              size: input.size,
+              material: input.material,
+              condition: input.condition,
+              purchasePrice: input.purchasePrice,
+              expectedShipping: input.expectedShipping,
+              targetProfit,
+              useTargetProfit,
+            }),
+          });
+          if (res.ok) {
+            const fb = (await res.json()) as AiFallback;
+            setAiFallback(fb);
+          }
+        } catch {
+          /* silent: fallback is best-effort */
+        } finally {
+          setAiFallbackLoading(false);
+        }
+      }
 
       if (bestRule && override) setJudgeMode('blended');
       else if (bestRule) setJudgeMode('master');
@@ -585,6 +649,8 @@ function App() {
             saleOverride={saleOverride}
             onSave={saveRecord}
             saving={saving}
+            aiFallback={aiFallback}
+            aiFallbackLoading={aiFallbackLoading}
           />
           <CompSearch
             keyword={compKeyword}

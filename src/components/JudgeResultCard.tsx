@@ -1,9 +1,20 @@
 import React from 'react';
-import { ExternalLink, RefreshCw, Save, Loader as Loader2 } from 'lucide-react';
+import { ExternalLink, RefreshCw, Save, Loader as Loader2, Sparkles } from 'lucide-react';
 import type { JudgeResult, MasterRule } from '../types';
 import type { SaleOverride } from '../lib/judge';
 import type { BrandCoverage } from '../lib/search';
 import { yen } from '../lib/number';
+
+type AiFallback = {
+  estimatedSaleMin: number;
+  estimatedSaleMax: number;
+  decision: string;
+  confidence: 'low' | 'medium' | 'high' | string;
+  reasoning: string;
+  sources: string[];
+  risks: string[];
+  recommendation: string;
+};
 
 type Props = {
   result: JudgeResult;
@@ -18,6 +29,8 @@ type Props = {
   saleOverride: SaleOverride | null;
   onSave: () => void;
   saving: boolean;
+  aiFallback?: AiFallback | null;
+  aiFallbackLoading?: boolean;
 };
 
 export function JudgeResultCard({
@@ -33,6 +46,8 @@ export function JudgeResultCard({
   saleOverride,
   onSave,
   saving,
+  aiFallback,
+  aiFallbackLoading,
 }: Props) {
   const decisionClass =
     result.decision === '買い' ? 'buy' :
@@ -127,6 +142,53 @@ export function JudgeResultCard({
         <div className="image-notes">
           <h3>画像から確認</h3>
           <ul>{imageNotes.map((n, i) => <li key={i}>{n}</li>)}</ul>
+        </div>
+      )}
+
+      {aiFallbackLoading && (
+        <div className="ai-fallback ai-fallback-loading">
+          <Loader2 className="spin" size={16} />
+          <span>マスター・売り切れ相場が無いため、AIが独自に参考相場を調査中…</span>
+        </div>
+      )}
+
+      {aiFallback && !aiFallbackLoading && (
+        <div className="ai-fallback">
+          <div className="ai-fallback-head">
+            <Sparkles size={16} />
+            <strong>AI独自判断（参考）</strong>
+            <span className={`ai-conf ai-conf-${aiFallback.confidence}`}>信頼度：{aiFallback.confidence}</span>
+          </div>
+          <p className="ai-fallback-note">
+            メルカリ・Yahoo!フリマ・マスターに該当データが無いため、ブランドの一般相場や公開情報からAIが独自に推定した参考値です。最終判断はご自身で行ってください。
+          </p>
+          <div className="ai-fallback-grid">
+            <div>
+              <span>AI推定 想定販売</span>
+              <strong>{yen(aiFallback.estimatedSaleMin)}〜{yen(aiFallback.estimatedSaleMax)}</strong>
+            </div>
+            <div>
+              <span>AI判定</span>
+              <strong>{aiFallback.decision}</strong>
+            </div>
+          </div>
+          <h4>根拠</h4>
+          <p>{aiFallback.reasoning}</p>
+          {aiFallback.sources?.length > 0 && (
+            <>
+              <h4>参照した情報源（推定）</h4>
+              <ul>{aiFallback.sources.map((s, i) => <li key={i}>{s}</li>)}</ul>
+            </>
+          )}
+          {aiFallback.risks?.length > 0 && (
+            <>
+              <h4>注意点</h4>
+              <ul>{aiFallback.risks.map((s, i) => <li key={i}>{s}</li>)}</ul>
+            </>
+          )}
+          {aiFallback.recommendation && (
+            <p className="ai-fallback-reco"><strong>AIからのアドバイス：</strong>{aiFallback.recommendation}</p>
+          )}
         </div>
       )}
 

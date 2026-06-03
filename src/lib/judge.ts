@@ -43,6 +43,12 @@ export function judgeProduct(
       saleMax = override.saleMax;
     }
   }
+
+  if (saleMin > 0 && (saleMax <= saleMin || (saleMax - saleMin) / Math.max(saleMin, 1) < 0.05)) {
+    const mid = (saleMin + saleMax) / 2;
+    saleMin = Math.max(0, Math.round(mid * 0.9));
+    saleMax = Math.round(mid * 1.1);
+  }
   const maxBuy = toNumber(rule?.仕入れ上限_max, 0);
   const shipMin = input.expectedShipping || toNumber(rule?.想定送料_min, 230);
   const shipMax = input.expectedShipping || toNumber(rule?.想定送料_max, shipMin);

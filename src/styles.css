@@ -21,12 +21,14 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+html, body { margin: 0; padding: 0; max-width: 100%; overflow-x: hidden; }
 body {
   background: var(--bone);
   color: var(--ink);
   font-size: 15px;
   line-height: 1.55;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 ::selection { background: #1a1a1a; color: #f6f4ee; }
 a { color: var(--ink); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
@@ -648,6 +650,90 @@ select, input[list] {
 }
 .toggle-pill.active:hover { background: var(--ink-soft); }
 
+.ai-fallback {
+  margin-top: 18px;
+  padding: 16px 18px;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--ink);
+  border-radius: 2px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.ai-fallback-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-style: italic;
+}
+.ai-fallback-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.ai-fallback-head strong {
+  font-size: 14px;
+  letter-spacing: .04em;
+}
+.ai-conf {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--muted);
+}
+.ai-conf-high { color: var(--green); border-color: var(--green); }
+.ai-conf-medium { color: var(--orange); border-color: var(--orange); }
+.ai-conf-low { color: var(--red); border-color: var(--red); }
+.ai-fallback-note {
+  margin: 6px 0 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.ai-fallback-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin: 10px 0 14px;
+}
+.ai-fallback-grid > div {
+  background: var(--bone-warm);
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  border-radius: 2px;
+}
+.ai-fallback-grid span {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.ai-fallback-grid strong { font-size: 16px; }
+.ai-fallback h4 {
+  margin: 12px 0 4px;
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ai-fallback ul { margin: 0; padding-left: 18px; }
+.ai-fallback-reco {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--bone-warm);
+  border-radius: 2px;
+  font-size: 13px;
+}
+
 /* search & tables */
 .search-card .wide { margin-bottom: 18px; }
 .table-wrap {
@@ -1053,17 +1139,37 @@ li { margin: 6px 0; font-size: 13px; line-height: 1.55; }
 }
 
 @media (max-width: 480px) {
+  body { font-size: 16px; line-height: 1.6; }
   .form-grid { grid-template-columns: 1fr; }
   .preview-grid { grid-template-columns: repeat(2, 1fr); }
-  th, td { padding: 8px 10px; font-size: 11px; }
+  th, td { padding: 10px 8px; font-size: 13px; }
   .hero h1 { font-size: 32px; }
-  .card { padding: 18px; }
+  .hero p { font-size: 13px; }
+  .card { padding: 18px 16px; }
+  .card h2 { font-size: 13px; }
   .score { width: 64px; height: 64px; font-size: 28px; }
   .decision { font-size: 22px; }
-  .yen-input input { width: 110px; font-size: 26px; }
+  .yen-input input { width: 100%; min-width: 0; max-width: 160px; font-size: 22px; }
   .comp-search-row { flex-direction: column; }
   .comp-search-row .btn { width: 100%; }
-  .settings-strip { padding: 16px 18px; gap: 14px; }
+  .settings-strip { padding: 16px 14px; gap: 12px; }
   .settings-strip-icon { width: 36px; height: 36px; }
-  .tabs button { padding: 12px 16px; font-size: 11px; }
+  .settings-strip-label { font-size: 11px; }
+  .settings-strip-controls { flex-wrap: wrap; gap: 8px; }
+  .settings-strip-toggle { width: 100%; }
+  .toggle-pill { flex: 1; padding: 10px 8px; font-size: 11px; }
+  .tabs button { padding: 12px 16px; font-size: 13px; }
+  .bottom-tabs button { font-size: 11px; }
+  .hint { font-size: 13px; }
+  label, .label { font-size: 13px; }
+  input, select, textarea, button { font-size: 16px; }
+  .badge, .match-badge, .mode-pill { font-size: 11px; }
+  .comp-list a { gap: 8px; }
+  .comp-title { font-size: 13px; }
+  .comp-price { font-size: 13px; }
+  .comp-thumb { width: 56px; height: 56px; }
+  .table-wrap { -webkit-overflow-scrolling: touch; }
+  table { min-width: 0; width: 100%; }
+  pre, code { white-space: pre-wrap; word-break: break-word; }
+  a { word-break: break-all; }
 }
