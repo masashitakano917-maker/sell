@@ -19,6 +19,7 @@ export function judgeProduct(
   rules: MasterRule[],
   input: ProductInput,
   override?: SaleOverride | null,
+  targetProfit: number = 2500,
 ): JudgeResult {
   const rule = findBestRule(rules, input.brand, input.itemType, input.category);
   const masterMin = toNumber(rule?.想定販売価格_min, 0);
@@ -52,10 +53,11 @@ export function judgeProduct(
   const nextActions: string[] = [];
 
   const saleAvg = (saleMin + saleMax) / 2;
-  const targetProfit = 2500;
+  const profitGoal = Math.max(0, Math.round(targetProfit));
+  const profitLow = Math.round(profitGoal * 0.6);
   const noRuleSuggestedMaxBuy =
     !rule && saleAvg > 0
-      ? Math.max(0, Math.floor(saleAvg * 0.9 - shipMax - targetProfit))
+      ? Math.max(0, Math.floor(saleAvg * 0.9 - shipMax - profitGoal))
       : 0;
 
   let score = 0;
@@ -72,7 +74,7 @@ export function judgeProduct(
     );
     if (noRuleSuggestedMaxBuy > 0) {
       reasons.push(
-        `相場平均から逆算した仕入れ上限目安：${noRuleSuggestedMaxBuy.toLocaleString()}円（粗利${targetProfit.toLocaleString()}円確保ベース）`,
+        `相場平均から逆算した仕入れ上限目安：${noRuleSuggestedMaxBuy.toLocaleString()}円（粗利${profitGoal.toLocaleString()}円確保ベース）`,
       );
     }
   } else {
@@ -108,12 +110,18 @@ export function judgeProduct(
     }
   }
 
-  if (profitMin >= 3000) score += 20;
-  else if (profitMax >= 3000) score += 12;
-  else if (profitMax >= 1500) score += 5;
-  else {
+  if (profitMin >= profitGoal) {
+    score += 20;
+    reasons.push(`想定粗利が目標 ${profitGoal.toLocaleString()}円を最低でも達成`);
+  } else if (profitMax >= profitGoal) {
+    score += 12;
+    reasons.push(`上限売値で目標粗利 ${profitGoal.toLocaleString()}円を達成`);
+  } else if (profitMax >= profitLow) {
+    score += 5;
+    warnings.push(`想定粗利が目標 ${profitGoal.toLocaleString()}円に届きません（最大 ${Math.round(profitMax).toLocaleString()}円）`);
+  } else {
     score -= 15;
-    warnings.push('想定粗利が低いです。値下げ・送料で赤字化しやすいです。');
+    warnings.push(`想定粗利が目標 ${profitGoal.toLocaleString()}円を大きく下回っています。値下げ・送料で赤字化しやすいです。`);
   }
 
   const materialText = `${input.material} ${rule?.素材タグ ?? ''} ${rule?.素材加点 ?? ''}`;

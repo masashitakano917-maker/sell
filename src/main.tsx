@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Sparkles, LogOut, ClipboardList, Search as SearchIcon, Layers } from 'lucide-react';
+import { Sparkles, LogOut, ClipboardList, Search as SearchIcon, Layers, Target, Check } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import masterData from './data/master.json';
 import type { MasterRule, ProductInput } from './types';
@@ -60,6 +60,11 @@ function App() {
   const [compMatching, setCompMatching] = useState(false);
   const lastAutoKeyword = useRef<string>('');
 
+  const [targetProfit, setTargetProfit] = useState<number>(2500);
+  const [targetProfitDraft, setTargetProfitDraft] = useState<string>('2500');
+  const [savingTarget, setSavingTarget] = useState(false);
+  const [targetSavedAt, setTargetSavedAt] = useState<number>(0);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
@@ -71,9 +76,45 @@ function App() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('user_settings')
+        .select('target_profit')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      if (data && typeof data.target_profit === 'number') {
+        setTargetProfit(data.target_profit);
+        setTargetProfitDraft(String(data.target_profit));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [session]);
+
+  async function saveTargetProfit() {
+    if (!session) return;
+    const v = Math.max(0, Math.round(Number(targetProfitDraft) || 0));
+    setSavingTarget(true);
+    const { error } = await supabase.from('user_settings').upsert(
+      { user_id: session.user.id, target_profit: v, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' },
+    );
+    setSavingTarget(false);
+    if (error) {
+      alert(`目標粗利の保存に失敗しました：${error.message}`);
+      return;
+    }
+    setTargetProfit(v);
+    setTargetProfitDraft(String(v));
+    setTargetSavedAt(Date.now());
+  }
+
   const result = useMemo(
-    () => judgeProduct(rules, input, useActualSales ? saleOverride : null),
-    [input, useActualSales, saleOverride],
+    () => judgeProduct(rules, input, useActualSales ? saleOverride : null, targetProfit),
+    [input, useActualSales, saleOverride, targetProfit],
   );
   const bestRule = useMemo(
     () => findBestRule(rules, input.brand, input.itemType, input.category),
@@ -452,8 +493,40 @@ function App() {
       </nav>
 
       {tab === 'judge' && (
-        <main className="grid">
-          <PurchaseForm
+        <>
+          <div className="settings-strip">
+            <div className="settings-strip-icon">
+              <Target size={18} />
+            </div>
+            <div className="settings-strip-body">
+              <div className="settings-strip-label">あなたの目標粗利（AI判定の基準値）</div>
+              <div className="settings-strip-controls">
+                <div className="yen-input">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={targetProfitDraft}
+                    onChange={(e) => setTargetProfitDraft(e.target.value)}
+                    placeholder="2500"
+                  />
+                  <span>円</span>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={saveTargetProfit}
+                  disabled={savingTarget || Number(targetProfitDraft) === targetProfit}
+                >
+                  {savingTarget ? '保存中…' : Date.now() - targetSavedAt < 1500 ? <><Check size={14} /> 保存済</> : '保存'}
+                </button>
+              </div>
+              <p className="settings-strip-hint">
+                現在の基準：<strong>{targetProfit.toLocaleString()}円</strong>。AIはこの粗利が確保できるかを基準に「買い／見送り」を判定します。
+              </p>
+            </div>
+          </div>
+          <main className="grid">
+            <PurchaseForm
             input={input}
             onChange={setInput}
             images={images}
@@ -487,6 +560,7 @@ function App() {
             matching={compMatching}
           />
         </main>
+        </>
       )}
 
       {tab === 'records' && <Records />}
