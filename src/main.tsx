@@ -51,7 +51,7 @@ function App() {
   const [analyzing, setAnalyzing] = useState(false);
   const [aiAvailable, setAiAvailable] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [judgeMode, setJudgeMode] = useState<'master' | 'comps' | null>(null);
+  const [judgeMode, setJudgeMode] = useState<'master' | 'comps' | 'blended' | null>(null);
   const [imageNotes, setImageNotes] = useState<string[]>([]);
 
   const [compKeyword, setCompKeyword] = useState('');
@@ -255,14 +255,11 @@ function App() {
         }
       }
 
-      if (bestRule) {
-        setJudgeMode('master');
-        setUseActualSales(false);
-        setSaleOverride(null);
-      } else {
-        setJudgeMode('comps');
-        await searchComps();
-      }
+      await searchComps();
+
+      if (bestRule && saleOverride) setJudgeMode('blended');
+      else if (bestRule) setJudgeMode('master');
+      else setJudgeMode('comps');
     } finally {
       setAnalyzing(false);
     }
