@@ -144,6 +144,15 @@ Deno.serve(async (req: Request) => {
 
     if (!aiRes.ok) {
       const errText = await aiRes.text();
+      if (aiRes.status === 429) {
+        return new Response(
+          JSON.stringify({
+            error: "GeminiのAPI無料枠を使い切りました。Google AI Studioで課金プランへ切り替えるか、24時間ほど待ってから再試行してください。",
+            code: "QUOTA_EXCEEDED",
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
       return new Response(JSON.stringify({ error: `Gemini ${aiRes.status}: ${errText}` }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

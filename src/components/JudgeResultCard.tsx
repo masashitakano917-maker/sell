@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, RefreshCw, Save, Loader2 } from 'lucide-react';
+import { ExternalLink, RefreshCw, Save, Loader as Loader2 } from 'lucide-react';
 import type { JudgeResult, MasterRule } from '../types';
 import type { SaleOverride } from '../lib/judge';
 import { yen } from '../lib/number';
@@ -71,12 +71,17 @@ export function JudgeResultCard({
         )}
       </div>
 
-      {bestRule && (
+      {bestRule ? (
         <div className="matched">
           <h3>一致したマスター</h3>
           <p><b>{bestRule.ブランド日本語 || bestRule.ブランド}</b> / {bestRule.服種類}</p>
           <p>{bestRule['商品名・狙い目']}</p>
           <p>優先度：{bestRule.優先度} / 仕入れ上限：{bestRule.仕入れ上限} / 販売目安：{bestRule.想定販売価格}</p>
+        </div>
+      ) : (
+        <div className="matched matched-none">
+          <h3>マスター対象外</h3>
+          <p className="hint">このブランド×服種類の組み合わせはマスターに登録されていません。判定スコアは一般ロジックのみで算出しています。</p>
         </div>
       )}
 

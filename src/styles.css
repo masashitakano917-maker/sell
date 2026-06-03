@@ -246,6 +246,8 @@ select {
   margin: 12px 0;
 }
 .matched p { margin: 4px 0; font-size: 14px; }
+.matched-none { background: #fff7ed; border-color: #fed7aa; }
+.matched-none h3 { color: #c2410c; }
 
 ul { padding-left: 20px; margin: 8px 0; }
 li { margin: 6px 0; font-size: 14px; line-height: 1.5; }

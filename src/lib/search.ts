@@ -10,19 +10,36 @@ export function findBestRule(rules: MasterRule[], brand: string, itemType: strin
   const c = norm(category);
 
   const scored = rules.map((rule) => {
-    let score = 0;
     const rb = norm(rule.ブランド);
     const rbjp = norm(rule.ブランド日本語);
     const rt = norm(rule.服種類 + ' ' + rule['商品名・狙い目']);
     const rc = norm(rule.カテゴリ);
 
-    if (b && (rb.includes(b) || b.includes(rb) || rbjp.includes(b) || b.includes(rbjp))) score += 60;
-    if (t && rt.includes(t)) score += 25;
-    if (c && rc.includes(c)) score += 15;
-    return { rule, score };
+    const brandMatch = !!b && (rb.includes(b) || b.includes(rb) || rbjp.includes(b) || b.includes(rbjp));
+    const itemMatch = !!t && rt.includes(t);
+    const categoryMatch = !!c && rc.includes(c);
+
+    let score = 0;
+    if (brandMatch) score += 60;
+    if (itemMatch) score += 25;
+    if (categoryMatch) score += 15;
+    return { rule, score, brandMatch, itemMatch, categoryMatch };
   }).sort((a, b) => b.score - a.score);
 
-  return scored[0]?.score > 0 ? scored[0].rule : undefined;
+  const top = scored[0];
+  if (!top || top.score === 0) return undefined;
+
+  if (b && t) {
+    const exact = scored.find((s) => s.brandMatch && s.itemMatch);
+    if (exact) return exact.rule;
+    return undefined;
+  }
+
+  if (b && !t) {
+    return top.brandMatch ? top.rule : undefined;
+  }
+
+  return top.rule;
 }
 
 export function filterRules(rules: MasterRule[], query: string): MasterRule[] {
