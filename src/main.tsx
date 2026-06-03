@@ -91,25 +91,30 @@ function App() {
     lastAutoKeyword.current = auto;
   }, [input.brand, input.itemType, input.size]);
 
+  async function fetchComps(keyword: string): Promise<CompSearchData | null> {
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/search-comps`;
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ keyword }),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(t || `HTTP ${res.status}`);
+    }
+    return (await res.json()) as CompSearchData;
+  }
+
   async function searchComps() {
     const kw = compKeyword.trim();
     if (!kw) return;
     setCompLoading(true);
     try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/search-comps`;
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ keyword: kw }),
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(t || `HTTP ${res.status}`);
-      }
-      const data = (await res.json()) as CompSearchData;
+      const data = await fetchComps(kw);
+      if (!data) return;
       setCompData(data);
       const totalAvg = data.overall.average;
       const totalCount = data.overall.count;
@@ -125,64 +130,78 @@ function App() {
     }
   }
 
+  async function runMatch(
+    base: CompSearchData,
+    refImages: string[],
+  ): Promise<{ data: CompSearchData; sameCount: number; sameAvg: number; sameMin: number; sameMax: number; similarCount: number; similarAvg: number } | null> {
+    const candidates = [
+      ...base.mercari.items.map((it, i) => ({ id: `m_${i}`, thumbnail: it.thumbnail, title: it.title, site: 'mercari' as const, idx: i })),
+      ...base.paypay.items.map((it, i) => ({ id: `p_${i}`, thumbnail: it.thumbnail, title: it.title, site: 'paypay' as const, idx: i })),
+    ].filter((c) => !!c.thumbnail);
+    if (candidates.length === 0) return null;
+
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/match-items`;
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        reference: refImages,
+        candidates: candidates.map((c) => ({ id: c.id, thumbnail: c.thumbnail, title: c.title })),
+      }),
+    });
+    if (!res.ok) return null;
+    const out = (await res.json()) as { matches: Array<{ id: string; level: 'same' | 'similar' | 'different' | 'unknown'; reason?: string }> };
+
+    const labelToCandidate = new Map<string, typeof candidates[number]>();
+    candidates.forEach((c, i) => labelToCandidate.set(`C${i + 1}`, c));
+
+    const next: CompSearchData = {
+      ...base,
+      mercari: { ...base.mercari, items: base.mercari.items.map((it) => ({ ...it, match: undefined })) },
+      paypay: { ...base.paypay, items: base.paypay.items.map((it) => ({ ...it, match: undefined })) },
+    };
+
+    for (const m of out.matches) {
+      const cand = labelToCandidate.get(m.id);
+      if (!cand) continue;
+      const target = cand.site === 'mercari' ? next.mercari.items[cand.idx] : next.paypay.items[cand.idx];
+      if (target) target.match = { level: m.level, reason: m.reason };
+    }
+
+    const samePrices: number[] = [];
+    const similarPrices: number[] = [];
+    for (const it of [...next.mercari.items, ...next.paypay.items]) {
+      if (it.match?.level === 'same') samePrices.push(it.price);
+      else if (it.match?.level === 'similar') similarPrices.push(it.price);
+    }
+    const avg = (xs: number[]) => xs.length === 0 ? 0 : Math.round(xs.reduce((a, b) => a + b, 0) / xs.length);
+    return {
+      data: next,
+      sameCount: samePrices.length,
+      sameAvg: avg(samePrices),
+      sameMin: samePrices.length ? Math.min(...samePrices) : 0,
+      sameMax: samePrices.length ? Math.max(...samePrices) : 0,
+      similarCount: similarPrices.length,
+      similarAvg: avg(similarPrices),
+    };
+  }
+
   async function matchComps() {
     if (!compData || images.length === 0) return;
     setCompMatching(true);
     try {
-      const candidates = [
-        ...compData.mercari.items.map((it, i) => ({ id: `m_${i}`, thumbnail: it.thumbnail, title: it.title, site: 'mercari' as const, idx: i })),
-        ...compData.paypay.items.map((it, i) => ({ id: `p_${i}`, thumbnail: it.thumbnail, title: it.title, site: 'paypay' as const, idx: i })),
-      ].filter((c) => !!c.thumbnail);
-
-      if (candidates.length === 0) {
+      const m = await runMatch(compData, images);
+      if (!m) {
         alert('サムネイル画像が無いため照合できません。');
         return;
       }
-
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/match-items`;
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          reference: images,
-          candidates: candidates.map((c) => ({ id: c.id, thumbnail: c.thumbnail, title: c.title })),
-        }),
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(t || `HTTP ${res.status}`);
-      }
-      const out = (await res.json()) as { matches: Array<{ id: string; candidateId?: string; level: 'same' | 'similar' | 'different' | 'unknown'; reason?: string }> };
-
-      const labelToCandidate = new Map<string, typeof candidates[number]>();
-      candidates.forEach((c, i) => labelToCandidate.set(`C${i + 1}`, c));
-
-      const next: CompSearchData = {
-        ...compData,
-        mercari: { ...compData.mercari, items: compData.mercari.items.map((it) => ({ ...it, match: undefined })) },
-        paypay: { ...compData.paypay, items: compData.paypay.items.map((it) => ({ ...it, match: undefined })) },
-      };
-
-      for (const m of out.matches) {
-        const cand = labelToCandidate.get(m.id);
-        if (!cand) continue;
-        const target = cand.site === 'mercari' ? next.mercari.items[cand.idx] : next.paypay.items[cand.idx];
-        if (target) target.match = { level: m.level, reason: m.reason };
-      }
-
-      setCompData(next);
-
-      const samePrices = [
-        ...next.mercari.items.filter((i) => i.match?.level === 'same').map((i) => i.price),
-        ...next.paypay.items.filter((i) => i.match?.level === 'same').map((i) => i.price),
-      ];
-      if (samePrices.length > 0) {
-        const avg = Math.round(samePrices.reduce((a, b) => a + b, 0) / samePrices.length);
-        setInput((prev) => ({ ...prev, soldCompsCount: samePrices.length }));
-        setSaleOverride({ saleMin: avg, saleMax: avg, sampleCount: samePrices.length });
+      setCompData(m.data);
+      if (m.sameCount > 0) {
+        setInput((prev) => ({ ...prev, soldCompsCount: m.sameCount }));
+        setSaleOverride({ saleMin: m.sameMin, saleMax: m.sameMax, sampleCount: m.sameCount });
         setUseActualSales(true);
       }
     } catch (e) {
@@ -243,21 +262,87 @@ function App() {
     }
   }
 
+  function buildSearchKeyword(): string {
+    const brandJp = bestRule?.ブランド日本語;
+    const brand = (brandJp && brandJp.trim()) || input.brand.trim();
+    const itemType = input.itemType.trim();
+    const sizeRaw = input.size.trim();
+    const size = sizeRaw.replace(/\s*\(.+\)$/, '').replace('フリー', 'F');
+    const parts = [brand, itemType, size].filter(Boolean);
+    return parts.join(' ').trim();
+  }
+
   async function runAIJudge() {
+    if (analyzing || compLoading || compMatching) return;
+    const kw = buildSearchKeyword();
+    if (!kw || kw.length < 2 || (!input.brand.trim() && !input.itemType.trim())) {
+      alert('ブランドと服種類を入力してから AI判定 を押してください。');
+      return;
+    }
+
     setAnalyzing(true);
     setImageNotes([]);
+    setSaleOverride(null);
+    setUseActualSales(false);
+    setCompKeyword(kw);
+
     try {
       const verify = await verifyImagesOnly();
-      if (verify) {
-        setImageNotes(verify.notes);
-        if (verify.hasDamage === true && !input.hasDamage) {
-          setInput((prev) => ({ ...prev, hasDamage: true }));
+      const notes: string[] = verify ? [...verify.notes] : [];
+      if (verify && verify.hasDamage === true && !input.hasDamage) {
+        setInput((prev) => ({ ...prev, hasDamage: true }));
+      }
+
+      let comp: CompSearchData | null = null;
+      try {
+        comp = await fetchComps(kw);
+      } catch (e) {
+        notes.push(`売り切れ検索に失敗：${(e as Error).message}`);
+      }
+
+      let override: SaleOverride | null = null;
+
+      if (comp) {
+        setCompData(comp);
+        const totalCount = comp.overall.count;
+        notes.push(`売り切れ相場検索：「${kw}」で ${totalCount}件ヒット`);
+
+        if (images.length > 0 && totalCount > 0) {
+          try {
+            const m = await runMatch(comp, images);
+            if (m) {
+              setCompData(m.data);
+              if (m.sameCount > 0) {
+                override = { saleMin: m.sameMin, saleMax: m.sameMax, sampleCount: m.sameCount };
+                notes.push(`画像照合：同一商品 ${m.sameCount}件 / 平均 ${m.sameAvg.toLocaleString()}円（範囲 ${m.sameMin.toLocaleString()}〜${m.sameMax.toLocaleString()}円）`);
+              } else if (m.similarCount > 0) {
+                override = { saleMin: m.similarAvg, saleMax: m.similarAvg, sampleCount: m.similarCount };
+                notes.push(`画像照合：同一なし／類似（色違い等）${m.similarCount}件 / 平均 ${m.similarAvg.toLocaleString()}円 を参考値として採用`);
+              } else {
+                notes.push('画像照合：同一・類似品なし。検索結果は無関係と判定。相場は使用しません。');
+              }
+            } else {
+              notes.push('画像照合：候補画像を取得できませんでした。');
+            }
+          } catch (e) {
+            notes.push(`画像照合に失敗：${(e as Error).message}`);
+          }
+        } else if (totalCount > 0 && images.length === 0) {
+          notes.push('画像未アップロードのため、検索結果との照合をスキップしました。相場の信頼度は低めです。');
+          const avg = comp.overall.average;
+          if (avg > 0) override = { saleMin: avg, saleMax: avg, sampleCount: totalCount };
         }
       }
 
-      await searchComps();
+      if (override) {
+        setSaleOverride(override);
+        setUseActualSales(true);
+        setInput((prev) => ({ ...prev, soldCompsCount: override!.sampleCount }));
+      }
 
-      if (bestRule && saleOverride) setJudgeMode('blended');
+      setImageNotes(notes);
+
+      if (bestRule && override) setJudgeMode('blended');
       else if (bestRule) setJudgeMode('master');
       else setJudgeMode('comps');
     } finally {
