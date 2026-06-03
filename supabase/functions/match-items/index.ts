@@ -129,7 +129,7 @@ Deno.serve(async (req: Request) => {
       text: "上記すべての候補について、リファレンスと同一商品かJSONで判定してください。idは C1, C2 のラベルを使用。",
     });
 
-    const model = "gemini-2.0-flash";
+    const model = "gemini-2.5-flash";
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const aiRes = await fetch(endpoint, {

@@ -63,7 +63,7 @@ Deno.serve(async (req: Request) => {
       parts.push({ inline_data: { mime_type: parsed.mime, data: parsed.data } });
     }
 
-    const model = "gemini-2.0-flash";
+    const model = "gemini-2.5-flash";
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const aiRes = await fetch(endpoint, {
