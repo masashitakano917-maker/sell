@@ -9,6 +9,10 @@ type Props = {
   result: JudgeResult;
   bestRule: MasterRule | undefined;
   brandCoverage?: BrandCoverage;
+  judgeMode?: 'master' | 'comps' | 'blended' | null;
+  imageNotes?: string[];
+  judgeMode?: 'master' | 'comps' | null;
+  imageNotes?: string[];
   useActualSales: boolean;
   onToggleActualSales: (next: boolean) => void;
   onApplyActualSales: () => void;
@@ -20,8 +24,12 @@ type Props = {
 
 export function JudgeResultCard({
   result,
+  judgeMode,
+  imageNotes,
   bestRule,
   brandCoverage,
+  judgeMode,
+  imageNotes,
   useActualSales,
   onToggleActualSales,
   onApplyActualSales,
@@ -35,9 +43,23 @@ export function JudgeResultCard({
     result.decision === '条件付き買い' ? 'maybe' :
     result.decision === '慎重' ? 'careful' : 'stop';
 
+      {judgeMode && (
+        <div className={`mode-pill mode-${judgeMode}`}>
+          {judgeMode === 'master' && 'パターン1：マスタールール判定'}
+          {judgeMode === 'comps' && 'パターン2：実売相場ベース判定（画像＋入力）'}
+          {judgeMode === 'blended' && 'パターン1＋2：マスター × 実売相場の統合判定'}
+        </div>
+      )}
+
   return (
     <section className={`card result-card ${decisionClass}`}>
       <h2>AI判定</h2>
+
+      {judgeMode && (
+        <div className={`mode-pill mode-${judgeMode}`}>
+          {judgeMode === 'master' ? 'パターン1：マスタールール判定' : 'パターン2：実売相場ベース判定（画像＋入力）'}
+        </div>
+      )}
 
       <div className="score-row">
         <div className="score">{result.score}</div>
@@ -101,13 +123,27 @@ export function JudgeResultCard({
             ))}
           </ul>
           <p className="hint mt-8">
-            この服種類は実売相場で判定が必要です。「メルカリ・Yahoo!フリマで売り切れ検索」を実行し、写真と商品詳細を入力してください。
+            この服種類は実売相場で判定が必要です。「AI判定する」を実行すると、自動で売り切れ相場を取得して判定します。
           </p>
         </div>
       ) : (
         <div className="matched matched-none">
           <h3>マスター対象外</h3>
-          <p className="hint">このブランドはマスターに登録されていません。実売相場をもとに判定します。先に売り切れ検索を実行し、写真と商品詳細を入力してください。</p>
+          <p className="hint">このブランドはマスターに登録されていません。「AI判定する」を実行すると、画像と入力内容から自動で売り切れ相場を取得して判定します。</p>
+        </div>
+      )}
+
+      {imageNotes && imageNotes.length > 0 && (
+        <div className="image-notes">
+          <h3>画像から確認</h3>
+          <ul>{imageNotes.map((n, i) => <li key={i}>{n}</li>)}</ul>
+        </div>
+      )}
+
+      {imageNotes && imageNotes.length > 0 && (
+        <div className="image-notes">
+          <h3>画像から確認</h3>
+          <ul>{imageNotes.map((n, i) => <li key={i}>{n}</li>)}</ul>
         </div>
       )}
 

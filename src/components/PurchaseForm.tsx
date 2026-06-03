@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, Sparkles, Loader as Loader2, Search } from 'lucide-react';
+import { Camera, Loader as Loader2, Sparkles } from 'lucide-react';
 import type { ProductInput } from '../types';
 import { CATEGORIES, ITEM_TYPES, BRANDS, CONDITIONS, sizesForCategory } from '../lib/options';
 
@@ -8,12 +8,9 @@ type Props = {
   onChange: (next: ProductInput) => void;
   images: string[];
   onImages: (files: FileList | null) => void;
-  onAnalyzeImages: () => void;
-  analyzing: boolean;
+  onJudge: () => void;
+  judging: boolean;
   aiAvailable: boolean;
-  onSearchComps: () => void;
-  searching: boolean;
-  canSearchComps: boolean;
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -25,7 +22,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export function PurchaseForm({ input, onChange, images, onImages, onAnalyzeImages, analyzing, aiAvailable, onSearchComps, searching, canSearchComps }: Props) {
+export function PurchaseForm({ input, onChange, images, onImages, onJudge, judging, aiAvailable }: Props) {
   function update<K extends keyof ProductInput>(key: K, value: ProductInput[K]) {
     onChange({ ...input, [key]: value });
   }
@@ -103,7 +100,7 @@ export function PurchaseForm({ input, onChange, images, onImages, onAnalyzeImage
         <Camera />
         <div style={{ flex: 1 }}>
           <strong>写真撮影・アップロード</strong>
-          <p>その場で撮影 or アップロードして AI に自動入力させられます。</p>
+          <p>キズ・汚れ・型などの確認に使用します。手入力の内容と画像の両方をAIが照合して判定します。</p>
           <div className="upload-buttons">
             <label className="btn btn-ghost">
               <Camera size={16} /> 撮影する
@@ -140,23 +137,12 @@ export function PurchaseForm({ input, onChange, images, onImages, onAnalyzeImage
       <div className="action-bar">
         <button
           type="button"
-          className="btn btn-primary btn-action"
-          onClick={onAnalyzeImages}
-          disabled={analyzing || !aiAvailable || images.length === 0}
-          title={images.length === 0 ? '先に写真をアップロードしてください' : ''}
+          className="btn btn-primary btn-action btn-judge"
+          onClick={onJudge}
+          disabled={judging}
         >
-          {analyzing ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
-          {analyzing ? 'AI解析中...' : 'AIで自動入力'}
-        </button>
-        <button
-          type="button"
-          className="btn btn-search btn-action"
-          onClick={onSearchComps}
-          disabled={searching || !canSearchComps}
-          title={!canSearchComps ? 'ブランドや服種類を入力してください' : ''}
-        >
-          {searching ? <Loader2 className="spin" size={18} /> : <Search size={18} />}
-          {searching ? '検索中...' : 'メルカリ・Yahoo!フリマで売り切れ検索'}
+          {judging ? <Loader2 className="spin" size={20} /> : <Sparkles size={20} />}
+          {judging ? 'AI判定中...' : 'AI判定する'}
         </button>
       </div>
     </section>

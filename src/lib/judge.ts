@@ -21,8 +21,26 @@ export function judgeProduct(
   override?: SaleOverride | null,
 ): JudgeResult {
   const rule = findBestRule(rules, input.brand, input.itemType, input.category);
-  const saleMin = override ? override.saleMin : toNumber(rule?.想定販売価格_min, 0);
-  const saleMax = override ? override.saleMax : toNumber(rule?.想定販売価格_max, saleMin);
+  const masterMin = toNumber(rule?.想定販売価格_min, 0);
+  const masterMax = toNumber(rule?.想定販売価格_max, masterMin);
+  let saleMin = masterMin;
+  let saleMax = masterMax;
+  let blended = false;
+  if (override) {
+    const compMid = (override.saleMin + override.saleMax) / 2;
+    if (rule && masterMax > 0) {
+      const masterMid = (masterMin + masterMax) / 2;
+      const spread = masterMax - masterMin;
+      const wComp = Math.min(1, override.sampleCount / 5);
+      const newMid = masterMid * (1 - wComp) + compMid * wComp;
+      saleMin = Math.max(0, Math.round(newMid - spread / 2));
+      saleMax = Math.round(newMid + spread / 2);
+      blended = true;
+    } else {
+      saleMin = override.saleMin;
+      saleMax = override.saleMax;
+    }
+  }
   const maxBuy = toNumber(rule?.仕入れ上限_max, 0);
   const shipMin = input.expectedShipping || toNumber(rule?.想定送料_min, 230);
   const shipMax = input.expectedShipping || toNumber(rule?.想定送料_max, shipMin);
@@ -63,7 +81,13 @@ export function judgeProduct(
   }
 
   if (override) {
-    reasons.push(`実売データ ${override.sampleCount}件で想定販売価格を補正：${override.saleMin.toLocaleString()}〜${override.saleMax.toLocaleString()}円`);
+    if (blended) {
+      reasons.push(
+        `マスター想定 ${masterMin.toLocaleString()}〜${masterMax.toLocaleString()}円 と 実売 ${override.sampleCount}件平均 ${Math.round((override.saleMin + override.saleMax) / 2).toLocaleString()}円 を統合：${saleMin.toLocaleString()}〜${saleMax.toLocaleString()}円`,
+      );
+    } else {
+      reasons.push(`実売データ ${override.sampleCount}件で想定販売価格を補正：${override.saleMin.toLocaleString()}〜${override.saleMax.toLocaleString()}円`);
+    }
   }
 
   if (input.purchasePrice > 0 && maxBuy > 0) {

@@ -6,8 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const SYSTEM_PROMPT = `あなたは中古衣料・バッグの目利きです。商品画像から以下を抽出し、必ずJSONで返してください。
-未確認なら null。日本語で。
+const SYSTEM_PROMPT = `あなたは中古衣料・バッグの目利きです。商品画像から、商品の状態（キズ・汚れ・型崩れ・タグ有無など）を中心に確認し、必ずJSONで返してください。
+ブランド・服種類・サイズ・素材は出品者が手入力するため、画像から推測できる範囲のみ返却。確認できない項目は null。日本語で。
+
 スキーマ:
 {
   "brand": string|null,
@@ -17,11 +18,14 @@ const SYSTEM_PROMPT = `あなたは中古衣料・バッグの目利きです。
   "material": string|null,
   "condition": string|null,
   "hasTag": boolean|null,
-  "hasDamage": boolean|null
+  "hasDamage": boolean|null,
+  "damageDetails": string|null
 }
-category は "レディース服" / "メンズ服" / "バッグ・小物" / "靴" / "高級ブランド" / "キッズ" / "スポーツ・アウトドア" のいずれか。
-itemType は "ワンピース" / "ブラウス・シャツ" / "ニット・カーディガン" / "アウター" / "パンツ" / "スカート" / "スーツ・セットアップ" / "バッグ" / "財布・小物" / "靴" / "スポーツウェア" のいずれか。
-condition は "新品・未使用" / "未使用に近い" / "美品" / "目立った傷や汚れなし" / "やや傷や汚れあり" / "傷や汚れあり" / "全体的に状態が悪い" のいずれか。`;
+
+- condition は "新品・未使用" / "未使用に近い" / "美品" / "目立った傷や汚れなし" / "やや傷や汚れあり" / "傷や汚れあり" / "全体的に状態が悪い" のいずれか。画像から判定できなければ null。
+- hasDamage は明確なキズ・シミ・汚れ・毛羽立ち・型崩れがあれば true。なければ false。判別できなければ null。
+- damageDetails は hasDamage=true のときに具体的な箇所と種類を簡潔に（例：「右袖口に黒い汚れ」「襟に毛玉」）。なければ null。
+- hasTag は新品タグ（値札）が画像に写っているなら true、無ければ false、判別できなければ null。`;
 
 type DataUrl = string;
 

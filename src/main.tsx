@@ -51,6 +51,8 @@ function App() {
   const [analyzing, setAnalyzing] = useState(false);
   const [aiAvailable, setAiAvailable] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [judgeMode, setJudgeMode] = useState<'master' | 'comps' | null>(null);
+  const [imageNotes, setImageNotes] = useState<string[]>([]);
 
   const [compKeyword, setCompKeyword] = useState('');
   const [compLoading, setCompLoading] = useState(false);
@@ -205,9 +207,8 @@ function App() {
     ).then(setImages);
   }
 
-  async function analyzeImages() {
-    if (images.length === 0) return;
-    setAnalyzing(true);
+  async function verifyImagesOnly(): Promise<{ hasDamage?: boolean; condition?: string; notes: string[] } | null> {
+    if (images.length === 0 || !aiAvailable) return null;
     try {
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-image`;
       const res = await fetch(apiUrl, {
@@ -220,23 +221,48 @@ function App() {
       });
       if (!res.ok) {
         if (res.status === 503) setAiAvailable(false);
-        const text = await res.text();
-        throw new Error(text || `HTTP ${res.status}`);
+        return null;
       }
       const data = await res.json();
-      setInput((prev) => ({
-        ...prev,
-        brand: data.brand || prev.brand,
-        category: data.category || prev.category,
-        itemType: data.itemType || prev.itemType,
-        size: data.size || prev.size,
-        material: data.material || prev.material,
-        condition: data.condition || prev.condition,
-        hasTag: data.hasTag ?? prev.hasTag,
-        hasDamage: data.hasDamage ?? prev.hasDamage,
-      }));
-    } catch (e) {
-      alert(`画像AI判定に失敗しました: ${(e as Error).message}`);
+      const notes: string[] = [];
+      if (typeof data.hasDamage === 'boolean') {
+        notes.push(data.hasDamage ? '画像確認：キズ・汚れの兆候あり' : '画像確認：目立つキズ・汚れなし');
+      }
+      if (typeof data.damageDetails === 'string' && data.damageDetails) {
+        notes.push(`詳細：${data.damageDetails}`);
+      }
+      if (typeof data.condition === 'string' && data.condition) {
+        notes.push(`画像から推定した状態：${data.condition}`);
+      }
+      if (data.hasTag === true) {
+        notes.push('画像確認：新品タグ写り込みあり');
+      }
+      return { hasDamage: data.hasDamage ?? undefined, condition: data.condition ?? undefined, notes };
+    } catch {
+      return null;
+    }
+  }
+
+  async function runAIJudge() {
+    setAnalyzing(true);
+    setImageNotes([]);
+    try {
+      const verify = await verifyImagesOnly();
+      if (verify) {
+        setImageNotes(verify.notes);
+        if (verify.hasDamage === true && !input.hasDamage) {
+          setInput((prev) => ({ ...prev, hasDamage: true }));
+        }
+      }
+
+      if (bestRule) {
+        setJudgeMode('master');
+        setUseActualSales(false);
+        setSaleOverride(null);
+      } else {
+        setJudgeMode('comps');
+        await searchComps();
+      }
     } finally {
       setAnalyzing(false);
     }
@@ -350,17 +376,16 @@ function App() {
             onChange={setInput}
             images={images}
             onImages={onImages}
-            onAnalyzeImages={analyzeImages}
-            analyzing={analyzing}
+            onJudge={runAIJudge}
+            judging={analyzing || compLoading}
             aiAvailable={aiAvailable}
-            onSearchComps={searchComps}
-            searching={compLoading}
-            canSearchComps={!!compKeyword.trim()}
           />
           <JudgeResultCard
             result={result}
             bestRule={bestRule}
             brandCoverage={brandCoverage}
+            judgeMode={judgeMode}
+            imageNotes={imageNotes}
             useActualSales={useActualSales}
             onToggleActualSales={toggleActualSales}
             onApplyActualSales={applyActualSales}
