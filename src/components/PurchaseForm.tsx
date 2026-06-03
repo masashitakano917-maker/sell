@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Camera, Loader as Loader2, Sparkles } from 'lucide-react';
 import type { ProductInput } from '../types';
-import { CATEGORIES, ITEM_TYPES, BRANDS, CONDITIONS, sizesForCategory } from '../lib/options';
+import { CATEGORIES, ITEM_TYPES, CONDITIONS, sizesForCategory } from '../lib/options';
+import { BrandCombobox } from './BrandCombobox';
 
 type Props = {
   input: ProductInput;
@@ -15,10 +16,10 @@ type Props = {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="field">
+    <div className="field">
       <span>{label}</span>
       {children}
-    </label>
+    </div>
   );
 }
 
@@ -27,9 +28,6 @@ export function PurchaseForm({ input, onChange, images, onImages, onJudge, judgi
     onChange({ ...input, [key]: value });
   }
 
-  const knownBrand = BRANDS.some((b) => b.value === input.brand);
-  const [customBrand, setCustomBrand] = useState<boolean>(input.brand !== '' && !knownBrand);
-
   const sizeOptions = sizesForCategory(input.category);
 
   return (
@@ -37,38 +35,7 @@ export function PurchaseForm({ input, onChange, images, onImages, onJudge, judgi
       <h2>商品入力</h2>
       <div className="form-grid">
         <Field label="ブランド">
-          {customBrand ? (
-            <div className="brand-custom-row">
-              <input
-                value={input.brand}
-                onChange={(e) => update('brand', e.target.value)}
-                placeholder="ブランド名を入力"
-              />
-              <button
-                type="button"
-                className="btn-link"
-                onClick={() => { setCustomBrand(false); update('brand', ''); }}
-              >
-                一覧から選ぶ
-              </button>
-            </div>
-          ) : (
-            <select
-              value={input.brand}
-              onChange={(e) => {
-                if (e.target.value === '__custom__') {
-                  setCustomBrand(true);
-                  update('brand', '');
-                } else {
-                  update('brand', e.target.value);
-                }
-              }}
-            >
-              <option value="">選択してください</option>
-              {BRANDS.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
-              <option value="__custom__">その他（手入力）</option>
-            </select>
-          )}
+          <BrandCombobox value={input.brand} onChange={(v) => update('brand', v)} />
         </Field>
 
         <Field label="カテゴリ">
