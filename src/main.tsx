@@ -223,6 +223,11 @@ function App() {
       body: JSON.stringify({
         reference: refImages,
         candidates: candidates.map((c) => ({ id: c.id, thumbnail: c.thumbnail, title: c.title })),
+        context: {
+          brand: bestRule?.ブランド日本語 || input.brand,
+          itemType: input.itemType,
+          keyword: compKeyword,
+        },
       }),
     });
     if (!res.ok) return null;

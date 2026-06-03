@@ -8,22 +8,33 @@ const corsHeaders = {
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
-const SYSTEM_PROMPT = `あなたは中古品鑑定のエキスパートです。
-最初に提示される画像は「リファレンス（仕入れ予定品）」です。
-続いて C1, C2, ... と番号付きで「候補商品」の画像が提示されます。
-各候補について、リファレンスと同一商品か判定してください。
+const SYSTEM_PROMPT = `あなたは中古アパレル・バッグの目利きで、せどり仕入れの相場照合を担当します。
+最初に「リファレンス（仕入れ予定品）」の画像が提示されます。続いて C1, C2, ... と番号付きで「候補商品」の画像（メルカリ／Yahoo!フリマの売り切れ商品サムネイル）が提示されます。
+
+# 重要な判定基準（必読）
+あなたは品番や個体識別ではなく、**せどり相場の参考にできる程度に同じ商品か** を判定します。
+サムネイル画像は小さく、撮影環境（照明・背景・角度・トルソー有無）はバラバラです。これらの差は同一性判定に**使ってはいけません**。
 
 判定レベル:
-- "same": 同じブランドかつ同じ商品（型番・色・柄が同じ。サイズや状態の差は許容）
-- "similar": 同じカテゴリ／系統だが、別商品の可能性が高い（色違い・別シーズン・別シリーズ等）
-- "different": 明らかに別物（カテゴリやデザインが大きく異なる）
-- "unknown": 画像が小さい／不鮮明等で判定できない
+- "same": 以下のいずれかに該当する。
+  - 同じブランドの同じデザイン／同じプリント柄／同じコラボ商品（例：「agnes b. × IKON コラボの星座プリントワンピース」のように、特徴的な柄・刺繍・ロゴ配置・コラボ等が一致）
+  - サイズ違い・色違いでも、明らかに同じシリーズ／同型番の派生
+  - サイズ表記、撮影アングル、背景、トルソー使用の差は無視して同一とみなす
+- "similar": 同じブランド／カテゴリだが別商品（柄違い／シーズン違い／別シリーズ）
+- "different": 明らかに別物（カテゴリやデザインが大きく異なる、別ブランド）
+- "unknown": サムネイルが極端に不鮮明・画像が文字だけ等で柄やシルエットを確認できない
 
-必ず以下のJSONのみを返してください:
+# 判定の手順
+1. リファレンスの「特徴的な要素」を抽出する（例：星座柄、特定のロゴ、特徴的な切り替え、コラボ表示、独特の素材感）。
+2. 各候補について、その特徴的な要素が見えるかを最優先で確認する。
+3. 候補画像が複数枚並んでいる場合、どれか1枚にでも特徴が一致すれば "same" としてよい。
+4. **迷ったら "same" を選ぶ**。せどりの相場照合は「明確に違う」と言える時だけ "different" にする。
+5. タイトル文字列にコラボ名・型番・特徴的なキーワードがあれば、それも判定材料に使う。
+
+必ず以下のJSONのみを返す:
 {
   "matches": [
-    { "id": "C1", "level": "same"|"similar"|"different"|"unknown", "reason": "..." },
-    ...
+    { "id": "C1", "level": "same"|"similar"|"different"|"unknown", "reason": "簡潔な根拠（30〜60字）" }
   ]
 }`;
 
@@ -71,7 +82,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { reference, candidates } = (await req.json()) as { reference: string[]; candidates: Candidate[] };
+    const { reference, candidates, context } = (await req.json()) as { reference: string[]; candidates: Candidate[]; context?: { brand?: string; itemType?: string; keyword?: string } };
     if (!Array.isArray(reference) || reference.length === 0) {
       return new Response(JSON.stringify({ error: "reference required" }), {
         status: 400,
@@ -95,7 +106,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const limited = candidates.slice(0, 16);
+    const limited = candidates.slice(0, 24);
     const fetched = await Promise.all(
       limited.map(async (c) => {
         if (!c.thumbnail) return { c, img: null };
@@ -104,17 +115,25 @@ Deno.serve(async (req: Request) => {
       }),
     );
 
-    const parts: Array<Record<string, unknown>> = [
-      { text: "リファレンス画像（仕入れ予定品）です:" },
-      ...refImages.map((r) => ({ inline_data: { mime_type: r.mime, data: r.data } })),
-    ];
+    const parts: Array<Record<string, unknown>> = [];
+    if (context && (context.brand || context.itemType || context.keyword)) {
+      parts.push({
+        text: `# 検索コンテキスト
+ブランド: ${context.brand ?? "-"}
+服種類: ${context.itemType ?? "-"}
+検索キーワード: ${context.keyword ?? "-"}
+このブランド／カテゴリの相場照合を行います。`,
+      });
+    }
+    parts.push({ text: "# リファレンス画像（仕入れ予定品）" });
+    refImages.forEach((r) => parts.push({ inline_data: { mime_type: r.mime, data: r.data } }));
 
     const usableCandidates: Candidate[] = [];
     fetched.forEach(({ c, img }, i) => {
       if (!img) return;
       const label = `C${i + 1}`;
       usableCandidates.push({ ...c, id: label });
-      parts.push({ text: `候補 ${label} (${c.title ?? ""}):` });
+      parts.push({ text: `# 候補 ${label}\nタイトル: ${c.title ?? "-"}` });
       parts.push({ inline_data: { mime_type: img.mime, data: img.data } });
     });
 
@@ -126,7 +145,11 @@ Deno.serve(async (req: Request) => {
     }
 
     parts.push({
-      text: "上記すべての候補について、リファレンスと同一商品かJSONで判定してください。idは C1, C2 のラベルを使用。",
+      text: `# 指示
+上記すべての候補について、リファレンスと同一商品か JSON で判定してください。idは C1, C2 のラベルを使用。
+- プリント柄・コラボ・特徴的なロゴ／装飾が一致したら "same"。
+- 撮影アングル、背景、トルソー、サイズ、色みの差は同一性判定に使わない。
+- 迷ったら "different" ではなく "same" または "similar" を選ぶ。`,
     });
 
     const model = "gemini-2.5-flash";
