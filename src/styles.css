@@ -617,6 +617,37 @@ select, input[list] {
 }
 .settings-strip-hint strong { color: var(--ink); font-weight: 600; }
 
+.settings-strip-toggle {
+  display: inline-flex;
+  margin-top: 14px;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--paper);
+}
+.toggle-pill {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 9px 16px;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+  border-right: 1px solid var(--ink);
+}
+.toggle-pill:last-child { border-right: 0; }
+.toggle-pill:hover { background: var(--bone-warm); }
+.toggle-pill.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+.toggle-pill.active:hover { background: var(--ink-soft); }
+
 /* search & tables */
 .search-card .wide { margin-bottom: 18px; }
 .table-wrap {

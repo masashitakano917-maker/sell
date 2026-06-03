@@ -20,6 +20,7 @@ export function judgeProduct(
   input: ProductInput,
   override?: SaleOverride | null,
   targetProfit: number = 2500,
+  useTargetProfit: boolean = true,
 ): JudgeResult {
   const rule = findBestRule(rules, input.brand, input.itemType, input.category);
   const masterMin = toNumber(rule?.想定販売価格_min, 0);
@@ -100,7 +101,7 @@ export function judgeProduct(
       score -= 20;
       warnings.push(`仕入れ値が上限目安 ${maxBuy.toLocaleString()}円を超えています`);
     }
-  } else if (input.purchasePrice > 0 && noRuleSuggestedMaxBuy > 0) {
+  } else if (input.purchasePrice > 0 && noRuleSuggestedMaxBuy > 0 && useTargetProfit) {
     if (input.purchasePrice <= noRuleSuggestedMaxBuy) {
       score += 18;
       reasons.push(`仕入れ値が相場ベース上限 ${noRuleSuggestedMaxBuy.toLocaleString()}円以内`);
@@ -110,18 +111,26 @@ export function judgeProduct(
     }
   }
 
-  if (profitMin >= profitGoal) {
-    score += 20;
-    reasons.push(`想定粗利が目標 ${profitGoal.toLocaleString()}円を最低でも達成`);
-  } else if (profitMax >= profitGoal) {
-    score += 12;
-    reasons.push(`上限売値で目標粗利 ${profitGoal.toLocaleString()}円を達成`);
-  } else if (profitMax >= profitLow) {
-    score += 5;
-    warnings.push(`想定粗利が目標 ${profitGoal.toLocaleString()}円に届きません（最大 ${Math.round(profitMax).toLocaleString()}円）`);
+  if (useTargetProfit) {
+    if (profitMin >= profitGoal) {
+      score += 20;
+      reasons.push(`想定粗利が目標 ${profitGoal.toLocaleString()}円を最低でも達成`);
+    } else if (profitMax >= profitGoal) {
+      score += 12;
+      reasons.push(`上限売値で目標粗利 ${profitGoal.toLocaleString()}円を達成`);
+    } else if (profitMax >= profitLow) {
+      score += 5;
+      warnings.push(`想定粗利が目標 ${profitGoal.toLocaleString()}円に届きません（最大 ${Math.round(profitMax).toLocaleString()}円）`);
+    } else {
+      score -= 15;
+      warnings.push(`想定粗利が目標 ${profitGoal.toLocaleString()}円を大きく下回っています。値下げ・送料で赤字化しやすいです。`);
+    }
   } else {
-    score -= 15;
-    warnings.push(`想定粗利が目標 ${profitGoal.toLocaleString()}円を大きく下回っています。値下げ・送料で赤字化しやすいです。`);
+    reasons.push('目標粗利は AI判定に含めていません（粗利は参考表示のみ）');
+    if (profitMax < 0) {
+      score -= 12;
+      warnings.push('上限売値でも赤字想定です。');
+    }
   }
 
   const materialText = `${input.material} ${rule?.素材タグ ?? ''} ${rule?.素材加点 ?? ''}`;
@@ -184,7 +193,7 @@ export function judgeProduct(
     estimatedSaleMax: saleMax,
     estimatedProfitMin: profitMin,
     estimatedProfitMax: profitMax,
-    suggestedMaxBuy: maxBuy > 0 ? maxBuy : noRuleSuggestedMaxBuy > 0 ? noRuleSuggestedMaxBuy : undefined,
+    suggestedMaxBuy: maxBuy > 0 ? maxBuy : (useTargetProfit && noRuleSuggestedMaxBuy > 0) ? noRuleSuggestedMaxBuy : undefined,
     reasons,
     warnings,
     nextActions,

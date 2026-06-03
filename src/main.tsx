@@ -62,6 +62,7 @@ function App() {
 
   const [targetProfit, setTargetProfit] = useState<number>(2500);
   const [targetProfitDraft, setTargetProfitDraft] = useState<string>('2500');
+  const [useTargetProfit, setUseTargetProfit] = useState<boolean>(true);
   const [savingTarget, setSavingTarget] = useState(false);
   const [targetSavedAt, setTargetSavedAt] = useState<number>(0);
 
@@ -82,13 +83,16 @@ function App() {
     (async () => {
       const { data } = await supabase
         .from('user_settings')
-        .select('target_profit')
+        .select('target_profit, use_target_profit')
         .eq('user_id', session.user.id)
         .maybeSingle();
       if (cancelled) return;
       if (data && typeof data.target_profit === 'number') {
         setTargetProfit(data.target_profit);
         setTargetProfitDraft(String(data.target_profit));
+      }
+      if (data && typeof data.use_target_profit === 'boolean') {
+        setUseTargetProfit(data.use_target_profit);
       }
     })();
     return () => { cancelled = true; };
@@ -99,7 +103,7 @@ function App() {
     const v = Math.max(0, Math.round(Number(targetProfitDraft) || 0));
     setSavingTarget(true);
     const { error } = await supabase.from('user_settings').upsert(
-      { user_id: session.user.id, target_profit: v, updated_at: new Date().toISOString() },
+      { user_id: session.user.id, target_profit: v, use_target_profit: useTargetProfit, updated_at: new Date().toISOString() },
       { onConflict: 'user_id' },
     );
     setSavingTarget(false);
@@ -112,9 +116,21 @@ function App() {
     setTargetSavedAt(Date.now());
   }
 
+  async function toggleUseTargetProfit(next: boolean) {
+    setUseTargetProfit(next);
+    if (!session) return;
+    const { error } = await supabase.from('user_settings').upsert(
+      { user_id: session.user.id, target_profit: targetProfit, use_target_profit: next, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' },
+    );
+    if (error) {
+      alert(`設定の保存に失敗しました：${error.message}`);
+    }
+  }
+
   const result = useMemo(
-    () => judgeProduct(rules, input, useActualSales ? saleOverride : null, targetProfit),
-    [input, useActualSales, saleOverride, targetProfit],
+    () => judgeProduct(rules, input, useActualSales ? saleOverride : null, targetProfit, useTargetProfit),
+    [input, useActualSales, saleOverride, targetProfit, useTargetProfit],
   );
   const bestRule = useMemo(
     () => findBestRule(rules, input.brand, input.itemType, input.category),
@@ -519,8 +535,30 @@ function App() {
                   {savingTarget ? '保存中…' : Date.now() - targetSavedAt < 1500 ? <><Check size={14} /> 保存済</> : '保存'}
                 </button>
               </div>
+              <div className="settings-strip-toggle" role="group" aria-label="AI判定への目標粗利の反映">
+                <button
+                  type="button"
+                  className={`toggle-pill ${useTargetProfit ? 'active' : ''}`}
+                  onClick={() => toggleUseTargetProfit(true)}
+                  aria-pressed={useTargetProfit}
+                >
+                  AI判定に含める
+                </button>
+                <button
+                  type="button"
+                  className={`toggle-pill ${!useTargetProfit ? 'active' : ''}`}
+                  onClick={() => toggleUseTargetProfit(false)}
+                  aria-pressed={!useTargetProfit}
+                >
+                  含めない（参考のみ）
+                </button>
+              </div>
               <p className="settings-strip-hint">
-                現在の基準：<strong>{targetProfit.toLocaleString()}円</strong>。AIはこの粗利が確保できるかを基準に「買い／見送り」を判定します。
+                {useTargetProfit ? (
+                  <>現在の基準：<strong>{targetProfit.toLocaleString()}円</strong>。AIはこの粗利が確保できるかを基準に「買い／見送り」を判定します。</>
+                ) : (
+                  <>目標粗利は<strong>AI判定に含めません</strong>。スコアは粗利以外の要素（相場・状態・ブランド等）から算出され、想定粗利は参考表示のみになります。</>
+                )}
               </p>
             </div>
           </div>
