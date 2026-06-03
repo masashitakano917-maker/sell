@@ -96,7 +96,7 @@ export function CompSearch({ keyword, onKeyword, onSearch, loading, data, hasRef
   return (
     <section className="card">
       <h2>売り切れ相場検索</h2>
-      <p className="hint">メルカリと PayPay フリマで「売り切れ」を自動検索します。</p>
+      <p className="hint">メルカリと Yahoo!フリマで「売り切れ」を自動検索します。</p>
       <div className="comp-search-row">
         <input
           value={keyword}
@@ -131,7 +131,7 @@ export function CompSearch({ keyword, onKeyword, onSearch, loading, data, hasRef
           )}
           <div className="comp-grid">
             <SiteBlock name="メルカリ" data={data.mercari} />
-            <SiteBlock name="PayPay フリマ" data={data.paypay} />
+            <SiteBlock name="Yahoo!フリマ" data={data.paypay} />
           </div>
         </>
       )}

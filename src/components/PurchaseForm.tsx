@@ -156,7 +156,7 @@ export function PurchaseForm({ input, onChange, images, onImages, onAnalyzeImage
           title={!canSearchComps ? 'ブランドや服種類を入力してください' : ''}
         >
           {searching ? <Loader2 className="spin" size={18} /> : <Search size={18} />}
-          {searching ? '検索中...' : 'メルカリ・PayPayで売り切れ検索'}
+          {searching ? '検索中...' : 'メルカリ・Yahoo!フリマで売り切れ検索'}
         </button>
       </div>
     </section>
