@@ -5,7 +5,7 @@ import type { Session } from '@supabase/supabase-js';
 import masterData from './data/master.json';
 import type { MasterRule, ProductInput } from './types';
 import { findBestRule, getBrandCoverage } from './lib/search';
-import { judgeProduct, type SaleOverride } from './lib/judge';
+import { judgeProduct, medianWithIQR, type SaleOverride } from './lib/judge';
 import { fetchSaleOverride } from './lib/sales';
 import { supabase } from './lib/supabase';
 import { Auth } from './components/Auth';
@@ -206,7 +206,19 @@ function App() {
   async function runMatch(
     base: CompSearchData,
     refImages: string[],
-  ): Promise<{ data: CompSearchData; sameCount: number; sameAvg: number; sameMin: number; sameMax: number; similarCount: number; similarAvg: number } | null> {
+  ): Promise<{
+    data: CompSearchData;
+    sameCount: number;
+    sameAvg: number;
+    sameMin: number;
+    sameMax: number;
+    similarCount: number;
+    similarAvg: number;
+    similarMedian: number;
+    similarKeptCount: number;
+    similarMin: number;
+    similarMax: number;
+  } | null> {
     const candidates = [
       ...base.mercari.items.map((it, i) => ({ id: `m_${i}`, thumbnail: it.thumbnail, title: it.title, site: 'mercari' as const, idx: i })),
       ...base.paypay.items.map((it, i) => ({ id: `p_${i}`, thumbnail: it.thumbnail, title: it.title, site: 'paypay' as const, idx: i })),
@@ -256,6 +268,7 @@ function App() {
       else if (it.match?.level === 'similar') similarPrices.push(it.price);
     }
     const avg = (xs: number[]) => xs.length === 0 ? 0 : Math.round(xs.reduce((a, b) => a + b, 0) / xs.length);
+    const simStats = medianWithIQR(similarPrices);
     return {
       data: next,
       sameCount: samePrices.length,
@@ -264,6 +277,10 @@ function App() {
       sameMax: samePrices.length ? Math.max(...samePrices) : 0,
       similarCount: similarPrices.length,
       similarAvg: avg(similarPrices),
+      similarMedian: simStats.median,
+      similarKeptCount: simStats.count,
+      similarMin: simStats.min,
+      similarMax: simStats.max,
     };
   }
 
@@ -304,7 +321,7 @@ function App() {
     ).then(setImages);
   }
 
-  async function verifyImagesOnly(): Promise<{ hasDamage?: boolean; condition?: string; notes: string[] } | null> {
+  async function verifyImagesOnly(): Promise<{ hasDamage?: boolean; condition?: string; searchHints: string[]; notes: string[] } | null> {
     if (images.length === 0 || !aiAvailable) return null;
     try {
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-image`;
@@ -334,7 +351,16 @@ function App() {
       if (data.hasTag === true) {
         notes.push('画像確認：新品タグ写り込みあり');
       }
-      return { hasDamage: data.hasDamage ?? undefined, condition: data.condition ?? undefined, notes };
+      const rawHints = Array.isArray(data.searchHints) ? data.searchHints : [];
+      const searchHints: string[] = rawHints
+        .filter((s: unknown): s is string => typeof s === 'string')
+        .map((s: string) => s.trim())
+        .filter((s: string) => s.length > 0 && s.length <= 12)
+        .slice(0, 3);
+      if (searchHints.length > 0) {
+        notes.push(`画像由来の特徴語：${searchHints.join(' / ')}`);
+      }
+      return { hasDamage: data.hasDamage ?? undefined, condition: data.condition ?? undefined, searchHints, notes };
     } catch {
       return null;
     }
@@ -372,6 +398,9 @@ function App() {
         setInput((prev) => ({ ...prev, hasDamage: true }));
       }
 
+      const hints = verify?.searchHints ?? [];
+      let usedKeyword = kw;
+
       let comp: CompSearchData | null = null;
       try {
         comp = await fetchComps(kw);
@@ -379,16 +408,52 @@ function App() {
         notes.push(`売り切れ検索に失敗：${(e as Error).message}`);
       }
 
+      const initialCount = comp?.overall.count ?? 0;
+      let usedRetry = false;
+      if (comp && initialCount === 0 && hints.length > 0) {
+        const retryKw = `${kw} ${hints.slice(0, 2).join(' ')}`.trim();
+        try {
+          const retry = await fetchComps(retryKw);
+          if (retry && retry.overall.count > 0) {
+            comp = retry;
+            usedKeyword = retryKw;
+            usedRetry = true;
+            notes.push(`通常検索で0件 → 画像由来の特徴語を追加して再検索：「${retryKw}」で ${retry.overall.count}件ヒット`);
+            setCompKeyword(retryKw);
+          }
+        } catch (e) {
+          notes.push(`再検索に失敗：${(e as Error).message}`);
+        }
+      }
+
       let override: SaleOverride | null = null;
 
       if (comp) {
         setCompData(comp);
         const totalCount = comp.overall.count;
-        notes.push(`売り切れ相場検索：「${kw}」で ${totalCount}件ヒット`);
+        if (!usedRetry) {
+          notes.push(`売り切れ相場検索：「${usedKeyword}」で ${totalCount}件ヒット`);
+        }
 
         if (images.length > 0 && totalCount > 0) {
           try {
-            const m = await runMatch(comp, images);
+            let m = await runMatch(comp, images);
+            if (m && m.sameCount === 0 && hints.length > 0 && !usedRetry) {
+              const retryKw = `${kw} ${hints.slice(0, 2).join(' ')}`.trim();
+              try {
+                const retry = await fetchComps(retryKw);
+                if (retry && retry.overall.count > 0) {
+                  notes.push(`同一品ヒットなし → 画像由来の特徴語を追加して再検索：「${retryKw}」で ${retry.overall.count}件ヒット`);
+                  comp = retry;
+                  usedKeyword = retryKw;
+                  setCompKeyword(retryKw);
+                  setCompData(retry);
+                  m = await runMatch(retry, images);
+                }
+              } catch {
+                /* keep original match */
+              }
+            }
             if (m) {
               setCompData(m.data);
               if (m.sameCount > 0) {
@@ -400,11 +465,15 @@ function App() {
                 }
                 override = { saleMin: lo, saleMax: hi, sampleCount: m.sameCount };
                 notes.push(`画像照合：同一商品 ${m.sameCount}件 / 平均 ${m.sameAvg.toLocaleString()}円（範囲 ${m.sameMin.toLocaleString()}〜${m.sameMax.toLocaleString()}円）`);
-              } else if (m.similarCount > 0) {
-                const lo = Math.round(m.similarAvg * 0.85);
-                const hi = Math.round(m.similarAvg * 1.15);
-                override = { saleMin: lo, saleMax: hi, sampleCount: m.similarCount };
-                notes.push(`画像照合：同一なし／類似（色違い等）${m.similarCount}件 / 平均 ${m.similarAvg.toLocaleString()}円 を参考値として採用`);
+              } else if (m.similarCount > 0 && m.similarMedian > 0) {
+                const med = m.similarMedian;
+                const lo = Math.round(med * 0.88);
+                const hi = Math.round(med * 1.12);
+                override = { saleMin: lo, saleMax: hi, sampleCount: m.similarKeptCount };
+                const trimmedNote = m.similarKeptCount < m.similarCount
+                  ? `（外れ値除外で ${m.similarCount}→${m.similarKeptCount}件）`
+                  : '';
+                notes.push(`画像照合：同一なし／類似（色違い等）${m.similarCount}件 / 中央値 ${med.toLocaleString()}円${trimmedNote} を参考値として採用`);
               } else {
                 notes.push('画像照合：同一・類似品なし。検索結果は無関係と判定。相場は使用しません。');
               }

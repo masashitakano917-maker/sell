@@ -912,6 +912,15 @@ li { margin: 6px 0; font-size: 13px; line-height: 1.55; }
   flex: 1;
   border-bottom: 1px solid var(--line-strong);
 }
+.empty-rescue {
+  margin: 14px 0 4px;
+  padding: 14px 16px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 4px;
+  background: var(--bone-warm);
+}
+.empty-rescue p { margin: 0 0 6px; }
+.empty-rescue p:last-child { margin-bottom: 0; }
 .comp-overall {
   display: flex;
   gap: 26px;
@@ -1193,3 +1202,82 @@ li { margin: 6px 0; font-size: 13px; line-height: 1.55; }
   pre, code { white-space: pre-wrap; word-break: break-word; }
   a { word-break: break-all; }
 }
+
+.records-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  padding: 16px 18px;
+  background: var(--bone-warm);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  margin: 8px 0 16px;
+}
+.records-stats > div { display: flex; flex-direction: column; gap: 4px; }
+.records-stats span {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.records-stats strong {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 18px;
+  font-weight: 400;
+}
+.records-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--paper);
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--ink);
+  transition: background .15s, color .15s, border-color .15s;
+}
+.filter-pill:hover { background: var(--bone-warm); }
+.filter-pill.active {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.filter-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  opacity: .8;
+}
+.filter-search {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 13px;
+  background: var(--paper);
+}
+.hit-pill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+}
+.hit-pill.hit { background: #e9f8ed; color: #1f6f3a; border: 1px solid #bfe5cc; }
+.hit-pill.miss { background: #fdecec; color: #8a2727; border: 1px solid #efc3c3; }

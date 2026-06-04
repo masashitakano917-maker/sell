@@ -15,6 +15,43 @@ export type SaleOverride = {
   sampleCount: number;
 };
 
+export function medianWithIQR(prices: number[]): { median: number; min: number; max: number; count: number } {
+  if (prices.length === 0) return { median: 0, min: 0, max: 0, count: 0 };
+  const sorted = [...prices].sort((a, b) => a - b);
+  const q = (p: number) => {
+    const i = (sorted.length - 1) * p;
+    const lo = Math.floor(i);
+    const hi = Math.ceil(i);
+    if (lo === hi) return sorted[lo];
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+  };
+  if (sorted.length < 4) {
+    const mid = Math.floor(sorted.length / 2);
+    const median = sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+    return {
+      median: Math.round(median),
+      min: sorted[0],
+      max: sorted[sorted.length - 1],
+      count: sorted.length,
+    };
+  }
+  const q1 = q(0.25);
+  const q3 = q(0.75);
+  const iqr = q3 - q1;
+  const lo = q1 - 1.5 * iqr;
+  const hi = q3 + 1.5 * iqr;
+  const filtered = sorted.filter((v) => v >= lo && v <= hi);
+  const base = filtered.length > 0 ? filtered : sorted;
+  const m = Math.floor(base.length / 2);
+  const median = base.length % 2 ? base[m] : Math.round((base[m - 1] + base[m]) / 2);
+  return {
+    median: Math.round(median),
+    min: base[0],
+    max: base[base.length - 1],
+    count: base.length,
+  };
+}
+
 export function judgeProduct(
   rules: MasterRule[],
   input: ProductInput,

@@ -110,6 +110,7 @@ function SiteBlock({ name, data }: { name: string; data: CompSiteResult }) {
 }
 
 export function CompSearch({ keyword, onKeyword, onSearch, loading, data, hasReferenceImages, onMatch, matching }: Props) {
+  const isEmpty = data !== null && data.overall.count === 0;
   return (
     <section className="card">
       <h2>売り切れ相場検索</h2>
@@ -123,11 +124,22 @@ export function CompSearch({ keyword, onKeyword, onSearch, loading, data, hasRef
         />
         <button className="btn btn-primary" onClick={onSearch} disabled={loading || !keyword.trim()}>
           {loading ? <Loader2 className="spin" size={18} /> : <Search size={18} />}
-          {loading ? '検索中...' : '検索'}
+          {loading ? '検索中...' : isEmpty ? '再検索' : '検索'}
         </button>
       </div>
 
-      {data && (
+      {isEmpty && (
+        <div className="empty-rescue">
+          <p>
+            <strong>「{data!.keyword}」で売り切れ商品が見つかりませんでした。</strong>
+          </p>
+          <p className="hint">
+            キーワードを短くする／別の表記に変える／サイズや色を外すと見つかることがあります。上のキーワード欄を編集して「再検索」を押してください。
+          </p>
+        </div>
+      )}
+
+      {data && data.overall.count > 0 && (
         <>
           <div className="comp-overall">
             <div><span>合計売り切れ</span><strong>{data.overall.count}件</strong></div>
