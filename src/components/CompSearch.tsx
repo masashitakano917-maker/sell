@@ -112,7 +112,7 @@ function SiteBlock({ name, data }: { name: string; data: CompSiteResult }) {
 export function CompSearch({ keyword, onKeyword, onSearch, loading, data, hasReferenceImages, onMatch, matching }: Props) {
   const isEmpty = data !== null && data.overall.count === 0;
   return (
-    <section className="card">
+    <section className="card full-row">
       <h2>売り切れ相場検索</h2>
       <p className="hint">メルカリと Yahoo!フリマで「売り切れ」を自動検索します。</p>
       <div className="comp-search-row">

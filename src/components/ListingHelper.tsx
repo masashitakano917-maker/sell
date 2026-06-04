@@ -41,7 +41,7 @@ export function ListingHelper({ draft, loading, onGenerate, disabled, disabledRe
     : '';
 
   return (
-    <section className="card listing-card">
+    <section className="card listing-card full-row">
       <div className="row-between">
         <h2>出品文 自動生成</h2>
         <button

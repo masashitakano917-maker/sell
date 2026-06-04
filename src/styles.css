@@ -173,12 +173,16 @@ a:hover { text-decoration-thickness: 2px; }
 }
 .grid > * { min-width: 0; }
 .grid > .result-card {
-  grid-row: 1 / span 2;
+  grid-column: 2;
+  grid-row: 1;
   position: sticky;
   top: 16px;
   align-self: start;
   max-height: calc(100vh - 32px);
   overflow-y: auto;
+}
+.grid > .full-row {
+  grid-column: 1 / -1;
 }
 
 /* cards — flat, hairline-bordered, paper-like */

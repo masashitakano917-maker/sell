@@ -63,7 +63,7 @@ export function PricingPlan({ prices, purchasePrice, expectedShipping }: Props) 
   const dropPlan = [0, 0.05, 0.1, 0.15, 0.2];
 
   return (
-    <section className="card pricing-card">
+    <section className="card pricing-card full-row">
       <h2>推奨出品価格 3段階</h2>
       <p className="hint">{prices.length}件の売り切れ実績から、3つの価格戦略を提示します（手数料10%・送料{yen(expectedShipping)}差引後の手取り）。</p>
 
