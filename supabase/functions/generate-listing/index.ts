@@ -127,7 +127,7 @@ Deno.serve(async (req: Request) => {
 - 想定販売価格帯: ${payload.estimatedSaleMin ?? '?'}〜${payload.estimatedSaleMax ?? '?'} 円
 ${payload.masterTemplate ? `- マスター出品テンプレ: ${payload.masterTemplate}` : ''}`;
 
-    const model = "gemini-3-flash";
+    const model = "gemini-2.5-flash";
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const aiRes = await fetch(endpoint, {
