@@ -10,8 +10,18 @@ function uniq(values: (string | undefined)[]): string[] {
 export const CATEGORIES: string[] = uniq(rules.map((r) => r.カテゴリ))
   .filter((c) => !['仕入れ場所', '仕入れ判断', '出品テンプレ'].includes(c));
 
-export const ITEM_TYPES: string[] = uniq(rules.map((r) => r.服種類))
-  .filter((t) => !['要確認', '仕入れ場所', '運用ルール', '出品作業'].includes(t));
+const EXCLUDED_ITEM_TYPES = new Set(['要確認', '仕入れ場所', '運用ルール', '出品作業']);
+
+function splitItemType(t: string): string[] {
+  return t
+    .split(/[\/\uFF0F\u30FB]/)
+    .map((s) => s.trim())
+    .filter((s) => s && !EXCLUDED_ITEM_TYPES.has(s));
+}
+
+export const ITEM_TYPES: string[] = uniq(
+  rules.flatMap((r) => splitItemType(r.服種類 ?? '')),
+).sort((a, b) => a.localeCompare(b, 'ja'));
 
 export const BRANDS: { value: string; label: string }[] = uniq(
   rules.map((r) => `${r.ブランド}|||${r.ブランド日本語 ?? ''}`)

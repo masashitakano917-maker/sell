@@ -46,10 +46,15 @@ export function PurchaseForm({ input, onChange, images, onImages, onJudge, judgi
         </Field>
 
         <Field label="服種類">
-          <select value={input.itemType} onChange={(e) => update('itemType', e.target.value)}>
-            <option value="">選択してください</option>
-            {ITEM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
+          <input
+            list="item-type-options"
+            value={input.itemType}
+            onChange={(e) => update('itemType', e.target.value)}
+            placeholder="例：ブラウス（候補から選択 or 自由入力）"
+          />
+          <datalist id="item-type-options">
+            {ITEM_TYPES.map((t) => <option key={t} value={t} />)}
+          </datalist>
         </Field>
 
         <Field label="サイズ">
