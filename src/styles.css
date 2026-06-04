@@ -1148,10 +1148,14 @@ li { margin: 6px 0; font-size: 13px; line-height: 1.55; }
   .app { padding: 18px 16px 110px; }
   .grid { grid-template-columns: 1fr; }
   .grid > .result-card {
+    grid-column: auto;
     grid-row: auto;
     position: static;
     max-height: none;
     overflow-y: visible;
+  }
+  .grid > .full-row {
+    grid-column: auto;
   }
   .form-grid { grid-template-columns: repeat(2, 1fr); }
   .hero { flex-direction: column; align-items: flex-start; padding: 22px 0 18px; }
