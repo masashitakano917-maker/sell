@@ -701,10 +701,12 @@ function App() {
   return (
     <div className="app">
       <header className="hero">
-        <div>
-          <p className="eyebrow">SEDORI AI / VOL.04</p>
-          <h1>Sedori&nbsp;<em>Judge</em></h1>
-          <p>店舗せどりの仕入れを、マスター{rules.length}件と実売データの両軸で評価する。</p>
+        <div className="hero-brand">
+          <div className="hero-mark">SJ</div>
+          <div>
+            <h1>Sedori&nbsp;<em>Judge</em></h1>
+            <p className="hero-tagline">Resale Intelligence Dashboard</p>
+          </div>
         </div>
         <div className="hero-right">
           <button className="btn btn-ghost-light" onClick={() => supabase.auth.signOut()}>
