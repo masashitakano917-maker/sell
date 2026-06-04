@@ -36,6 +36,7 @@ export type PurchaseRecord = {
   actual_shipping: number | null;
   fee: number | null;
   sold_at: string | null;
+  purchase_location: string;
   created_at: string;
   updated_at: string;
 };

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Sparkles, LogOut, ClipboardList, Search as SearchIcon, Layers, Target, Check } from 'lucide-react';
+import { Sparkles, LogOut, ClipboardList, Search as SearchIcon, Layers, Target, Check, ChartBar as BarChart3 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import masterData from './data/master.json';
 import type { MasterRule, ProductInput } from './types';
@@ -14,6 +14,9 @@ import { JudgeResultCard } from './components/JudgeResultCard';
 import { Records } from './components/Records';
 import { MasterSearch } from './components/MasterSearch';
 import { CompSearch, type CompSearchData } from './components/CompSearch';
+import { Dashboard } from './components/Dashboard';
+import { ListingHelper, type ListingDraft } from './components/ListingHelper';
+import { PricingPlan } from './components/PricingPlan';
 import './styles.css';
 
 type AiFallback = {
@@ -43,9 +46,10 @@ const emptyInput: ProductInput = {
   hasDamage: false,
   hasSmell: false,
   authenticityUnclear: false,
+  purchaseLocation: '',
 };
 
-type Tab = 'judge' | 'records' | 'master';
+type Tab = 'judge' | 'records' | 'master' | 'dashboard';
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -73,6 +77,11 @@ function App() {
 
   const [aiFallback, setAiFallback] = useState<AiFallback | null>(null);
   const [aiFallbackLoading, setAiFallbackLoading] = useState(false);
+
+  const [imageHints, setImageHints] = useState<string[]>([]);
+  const [imageDamageDetails, setImageDamageDetails] = useState<string>('');
+  const [listingDraft, setListingDraft] = useState<ListingDraft | null>(null);
+  const [listingLoading, setListingLoading] = useState(false);
 
   const [targetProfit, setTargetProfit] = useState<number>(2500);
   const [targetProfitDraft, setTargetProfitDraft] = useState<string>('2500');
@@ -321,7 +330,7 @@ function App() {
     ).then(setImages);
   }
 
-  async function verifyImagesOnly(): Promise<{ hasDamage?: boolean; condition?: string; searchHints: string[]; notes: string[] } | null> {
+  async function verifyImagesOnly(): Promise<{ hasDamage?: boolean; condition?: string; damageDetails?: string; searchHints: string[]; notes: string[] } | null> {
     if (images.length === 0 || !aiAvailable) return null;
     try {
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-image`;
@@ -342,8 +351,9 @@ function App() {
       if (typeof data.hasDamage === 'boolean') {
         notes.push(data.hasDamage ? '画像確認：キズ・汚れの兆候あり' : '画像確認：目立つキズ・汚れなし');
       }
-      if (typeof data.damageDetails === 'string' && data.damageDetails) {
-        notes.push(`詳細：${data.damageDetails}`);
+      const damageDetails = typeof data.damageDetails === 'string' ? data.damageDetails : '';
+      if (damageDetails) {
+        notes.push(`詳細：${damageDetails}`);
       }
       if (typeof data.condition === 'string' && data.condition) {
         notes.push(`画像から推定した状態：${data.condition}`);
@@ -360,7 +370,7 @@ function App() {
       if (searchHints.length > 0) {
         notes.push(`画像由来の特徴語：${searchHints.join(' / ')}`);
       }
-      return { hasDamage: data.hasDamage ?? undefined, condition: data.condition ?? undefined, searchHints, notes };
+      return { hasDamage: data.hasDamage ?? undefined, condition: data.condition ?? undefined, damageDetails, searchHints, notes };
     } catch {
       return null;
     }
@@ -390,12 +400,19 @@ function App() {
     setUseActualSales(false);
     setCompKeyword(kw);
     setAiFallback(null);
+    setListingDraft(null);
+    setImageHints([]);
+    setImageDamageDetails('');
 
     try {
       const verify = await verifyImagesOnly();
       const notes: string[] = verify ? [...verify.notes] : [];
       if (verify && verify.hasDamage === true && !input.hasDamage) {
         setInput((prev) => ({ ...prev, hasDamage: true }));
+      }
+      if (verify) {
+        setImageHints(verify.searchHints);
+        setImageDamageDetails(verify.damageDetails ?? '');
       }
 
       const hints = verify?.searchHints ?? [];
@@ -591,6 +608,7 @@ function App() {
       ai_decision: result.decision,
       estimated_sale_min: Math.round(result.estimatedSaleMin),
       estimated_sale_max: Math.round(result.estimatedSaleMax),
+      purchase_location: input.purchaseLocation,
       status: 'purchased',
     });
     setSaving(false);
@@ -602,8 +620,70 @@ function App() {
       setImages([]);
       setSaleOverride(null);
       setUseActualSales(false);
+      setListingDraft(null);
+      setImageHints([]);
+      setImageDamageDetails('');
     }
   }
+
+  async function generateListing() {
+    if (listingLoading) return;
+    if (!input.brand && !input.itemType) {
+      alert('ブランドと服種類を入力してください。');
+      return;
+    }
+    setListingLoading(true);
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-listing`;
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          brand: input.brand,
+          brandJp: bestRule?.ブランド日本語,
+          itemType: input.itemType,
+          category: input.category,
+          size: input.size,
+          material: input.material,
+          condition: input.condition,
+          hasTag: input.hasTag,
+          hasDamage: input.hasDamage,
+          hasSmell: input.hasSmell,
+          authenticityUnclear: input.authenticityUnclear,
+          damageDetails: imageDamageDetails || undefined,
+          searchHints: imageHints,
+          estimatedSaleMin: Math.round(result.estimatedSaleMin),
+          estimatedSaleMax: Math.round(result.estimatedSaleMax),
+        }),
+      });
+      if (!res.ok) {
+        alert(`出品文の生成に失敗しました（HTTP ${res.status}）`);
+        return;
+      }
+      const draft = (await res.json()) as ListingDraft;
+      setListingDraft(draft);
+    } catch (e) {
+      alert(`出品文の生成に失敗しました：${(e as Error).message}`);
+    } finally {
+      setListingLoading(false);
+    }
+  }
+
+  const compPrices = useMemo(() => {
+    if (!compData) return [] as number[];
+    const pricesSame: number[] = [];
+    const pricesAll: number[] = [];
+    for (const it of [...compData.mercari.items, ...compData.paypay.items]) {
+      if (it.price > 0) {
+        pricesAll.push(it.price);
+        if (it.match?.level === 'same') pricesSame.push(it.price);
+      }
+    }
+    return pricesSame.length >= 2 ? pricesSame : pricesAll;
+  }, [compData]);
 
   function pickRule(r: MasterRule) {
     setInput((prev) => ({
@@ -639,6 +719,9 @@ function App() {
         </button>
         <button className={tab === 'records' ? 'active' : ''} onClick={() => setTab('records')}>
           <ClipboardList size={18} /> <span>記録</span>
+        </button>
+        <button className={tab === 'dashboard' ? 'active' : ''} onClick={() => setTab('dashboard')}>
+          <BarChart3 size={18} /> <span>損益</span>
         </button>
         <button className={tab === 'master' ? 'active' : ''} onClick={() => setTab('master')}>
           <Layers size={18} /> <span>マスター</span>
@@ -736,11 +819,26 @@ function App() {
             onMatch={matchComps}
             matching={compMatching}
           />
+          {compPrices.length >= 2 && (
+            <PricingPlan
+              prices={compPrices}
+              purchasePrice={input.purchasePrice}
+              expectedShipping={input.expectedShipping ?? 230}
+            />
+          )}
+          <ListingHelper
+            draft={listingDraft}
+            loading={listingLoading}
+            onGenerate={generateListing}
+            disabled={!input.brand && !input.itemType}
+            disabledReason="ブランドと服種類を入力してください。"
+          />
         </main>
         </>
       )}
 
       {tab === 'records' && <Records />}
+      {tab === 'dashboard' && <Dashboard />}
       {tab === 'master' && <MasterSearch rules={rules} onPick={pickRule} />}
 
       <nav className="bottom-tabs">
@@ -749,6 +847,9 @@ function App() {
         </button>
         <button className={tab === 'records' ? 'active' : ''} onClick={() => setTab('records')}>
           <ClipboardList size={20} /> <span>記録</span>
+        </button>
+        <button className={tab === 'dashboard' ? 'active' : ''} onClick={() => setTab('dashboard')}>
+          <BarChart3 size={20} /> <span>損益</span>
         </button>
         <button className={tab === 'master' ? 'active' : ''} onClick={() => setTab('master')}>
           <SearchIcon size={20} /> <span>マスター</span>

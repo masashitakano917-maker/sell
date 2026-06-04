@@ -163,6 +163,9 @@ export function Records() {
                 <p className="muted">
                   仕入：{yen(r.purchase_price)} / 想定：{yen(r.estimated_sale_min)}〜{yen(r.estimated_sale_max)} / スコア：{r.ai_score} {r.ai_decision}
                 </p>
+                {r.purchase_location && (
+                  <p className="muted small">仕入店舗：{r.purchase_location}</p>
+                )}
                 {r.status === 'sold' && r.sold_price != null && (
                   <p className="profit">
                     実売：{yen(r.sold_price)} - 送料{yen(r.actual_shipping ?? 0)} - 手数料{yen(r.fee ?? 0)} - 仕入{yen(r.purchase_price)}

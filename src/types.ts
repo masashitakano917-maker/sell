@@ -86,6 +86,7 @@ export type ProductInput = {
   hasDamage: boolean;
   hasSmell: boolean;
   authenticityUnclear: boolean;
+  purchaseLocation: string;
 };
 
 export type JudgeResult = {

@@ -85,6 +85,23 @@ export function PurchaseForm({ input, onChange, images, onImages, onJudge, judgi
         <Field label="売り切れ相場件数">
           <input type="number" inputMode="numeric" value={input.soldCompsCount || ''} onChange={(e) => update('soldCompsCount', Number(e.target.value))} placeholder="3" />
         </Field>
+
+        <Field label="仕入れ場所">
+          <input
+            list="store-options"
+            value={input.purchaseLocation}
+            onChange={(e) => update('purchaseLocation', e.target.value)}
+            placeholder="例：セカスト渋谷店"
+          />
+          <datalist id="store-options">
+            <option value="セカンドストリート" />
+            <option value="2nd STREET" />
+            <option value="ブックオフ" />
+            <option value="トレファクスタイル" />
+            <option value="キンジ" />
+            <option value="リサイクルショップ" />
+          </datalist>
+        </Field>
       </div>
 
       <div className="checks">
